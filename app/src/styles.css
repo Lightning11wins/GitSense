@@ -1,0 +1,236 @@
+/* Colors follow IntelliJ's New UI Dark theme. */
+:root {
+  --bg-editor: #1e1f22;
+  --bg-panel: #2b2d30;
+  --bg-hover: #393b40;
+  --bg-input: #1e1f22;
+  --bg-selected: #2e436e;
+  --bg-selected-inactive: #43454a;
+  --border: #1e1f22;
+  --border-subtle: #393b40;
+  --border-input: #4e5157;
+  --text: #dfe1e5;
+  --text-secondary: #868a91;
+  --text-disabled: #6f737a;
+  --accent: #3574f0;
+  --accent-hover: #3369d6;
+  --focus: #3574f0;
+  --error: #db5c5c;
+  --warning: #f2c55c;
+  --status-modified: #56a8f5;
+  --status-added: #73bd79;
+  --status-deleted: #868a91;
+  --status-untracked: #d5756c;
+  --status-conflicted: #e55765;
+  --font-ui: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "DejaVu Sans Mono", monospace;
+  --row-height: 24px;
+
+  color-scheme: dark;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-panel);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  outline: none;
+  user-select: text;
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4e515780;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.button {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border-input);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button:disabled {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.button.primary:disabled {
+  background: transparent;
+  border-color: var(--border-input);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.icon-button.active {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.icon-button:disabled {
+  color: var(--text-disabled);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.secondary {
+  color: var(--text-secondary);
+}
+
+.error-text {
+  color: var(--error);
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Trees and lists */
+
+.tree {
+  outline: none;
+  overflow: auto;
+  padding: 2px 0;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--row-height);
+  padding-right: 8px;
+  white-space: nowrap;
+}
+
+.tree-row:hover {
+  background: #ffffff08;
+}
+
+.tree:focus-within .tree-row.selected {
+  background: var(--bg-selected);
+}
+
+.tree-row.selected {
+  background: var(--bg-selected-inactive);
+}
+
+.tree-row .chevron {
+  flex: none;
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.tree-row .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-row .hint {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-modified,
+.status-renamed {
+  color: var(--status-modified);
+}
+
+.status-added {
+  color: var(--status-added);
+}
+
+.status-deleted {
+  color: var(--status-deleted);
+}
+
+.status-untracked {
+  color: var(--status-untracked);
+}
+
+.status-conflicted {
+  color: var(--status-conflicted);
+}

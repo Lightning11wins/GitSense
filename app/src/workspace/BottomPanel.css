@@ -1,0 +1,29 @@
+.bottom-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.console {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 12px 12px;
+  font-size: 12px;
+  user-select: text;
+}
+
+.console-entry {
+  margin-bottom: 6px;
+}
+
+.console-command.failed {
+  color: var(--error);
+}
+
+.console-output {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font: inherit;
+}

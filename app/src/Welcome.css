@@ -1,0 +1,82 @@
+.welcome {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-editor);
+}
+
+.welcome-card {
+  width: 440px;
+  max-height: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.welcome-card h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.welcome-card p {
+  margin: 0;
+}
+
+.machine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+}
+
+.machine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.machine:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.machine:disabled {
+  cursor: default;
+}
+
+.machine-label {
+  flex: 1;
+}
+
+.host-form {
+  display: flex;
+  gap: 8px;
+}
+
+.host-form input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -2,3 +2,4 @@
 node_modules
 /app/dist
 /.dev
+/app/src-tauri/gen
