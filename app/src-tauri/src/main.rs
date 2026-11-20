@@ -66,9 +66,8 @@ async fn connect(
     }
     let label = window.label().to_string();
     state.connections.lock().await.remove(&label);
-    let (connection, mut events) = gitsense_client::connect(&transport, &state.helper, &options)
-        .await
-        .map_err(|e| e.to_string())?;
+    let (connection, mut events) =
+        gitsense_client::connect(&transport, &state.helper, &options).await.map_err(|e| e.to_string())?;
     let info = connection.info().clone();
     state.connections.lock().await.insert(label.clone(), Arc::new(connection));
     state.settings.update(|s| s.last_machine = Some(machine.id.clone()));

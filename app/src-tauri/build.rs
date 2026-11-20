@@ -36,6 +36,9 @@ fn build_helper(workspace: &std::path::Path) -> PathBuf {
         .env_remove("CARGO_ENCODED_RUSTFLAGS")
         .status()
         .expect("Failed to run cargo to build the helper");
-    assert!(status.success(), "Failed to build the helper for {HELPER_TARGET}; is the target installed (rustup target add {HELPER_TARGET})?");
+    assert!(
+        status.success(),
+        "Failed to build the helper for {HELPER_TARGET}; is the target installed (rustup target add {HELPER_TARGET})?"
+    );
     target_dir.join(HELPER_TARGET).join("release/gitsense-helper")
 }

@@ -38,11 +38,8 @@ impl Store {
         let mut settings = self.settings.lock().unwrap();
         change(&mut settings);
         let json = serde_json::to_vec_pretty(&*settings).expect("Failed to serialize settings");
-        let saved = self
-            .file
-            .parent()
-            .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| std::fs::write(&self.file, json));
+        let saved =
+            self.file.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| std::fs::write(&self.file, json));
         if let Err(e) = saved {
             eprintln!("gitsense: Failed to save '{}': {e}", self.file.display());
         }
