@@ -154,6 +154,11 @@ export class Session {
     this.set({ console: [] });
   }
 
+  /** Shows a message in the status bar. */
+  notify(text: string) {
+    this.set({ notices: [...this.state.notices, text] });
+  }
+
   dismissNotice(index: number) {
     this.set({ notices: this.state.notices.filter((_, i) => i !== index) });
   }

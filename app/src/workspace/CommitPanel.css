@@ -34,10 +34,26 @@
   font-family: var(--font-ui);
 }
 
+.commit-options,
 .commit-buttons {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.commit-error {
+  max-height: 80px;
+  overflow: auto;
+}
+
+.tree-row .include {
+  flex: none;
+  margin: 0 2px 0 0;
+}
+
+.history-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .amend {
