@@ -32,6 +32,51 @@ remote: Array<RemoteBranch>, };
 
 export type ChangeKind = "added" | "modified" | "deleted" | "renamed" | "untracked" | "conflicted";
 
+export type Changelist = { 
+/**
+ * Unique within the repo.
+ */
+name: string, 
+/**
+ * The default list always exists and can't be deleted.
+ */
+is_default: boolean, 
+/**
+ * Files assigned to this list, relative to the repo root, sorted.
+ */
+paths: Array<string>, };
+
+export type ChangelistDeleteParams = { repo: string, name: string, 
+/**
+ * Where the deleted list's files go. Defaults to the default list. It also becomes the active list
+ * when the deleted list was active.
+ */
+move_to?: string, };
+
+export type ChangelistParams = { repo: string, 
+/**
+ * Changelist name.
+ */
+name: string, };
+
+export type ChangelistPathsParams = { repo: string, 
+/**
+ * Changelist name.
+ */
+name: string, 
+/**
+ * Paths relative to the repo root.
+ */
+paths: Array<string>, };
+
+export type ChangelistRenameParams = { repo: string, name: string, new_name: string, };
+
+export type Changelists = { 
+/**
+ * Name of the active list. Changed files not assigned to a list are in it.
+ */
+active: string, lists: Array<Changelist>, };
+
 export type CheckoutParams = { repo: string, target: CheckoutTarget, };
 
 export type CheckoutTarget = { "kind": "branch", name: string, } | { "kind": "remote", remote: string, name: string, } | { "kind": "revision", rev: string, };
@@ -316,4 +361,10 @@ export type Methods = {
   "push": { params: PushParams; result: Empty };
   "worktrees.list": { params: RepoParams; result: Array<Worktree> };
   "worktree.remove": { params: WorktreeRemoveParams; result: Empty };
+  "changelists.get": { params: RepoParams; result: Changelists };
+  "changelists.create": { params: ChangelistParams; result: Changelists };
+  "changelists.rename": { params: ChangelistRenameParams; result: Changelists };
+  "changelists.delete": { params: ChangelistDeleteParams; result: Changelists };
+  "changelists.set_active": { params: ChangelistParams; result: Changelists };
+  "changelists.move_paths": { params: ChangelistPathsParams; result: Changelists };
 };

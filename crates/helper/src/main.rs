@@ -2,6 +2,7 @@
 //! GitSense protocol on stdin/stdout.
 
 mod branches;
+mod changelists;
 mod changes;
 mod commit;
 mod error;
@@ -141,6 +142,13 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::Push::NAME => call::<p::Push>(ctx, params, remote::push),
         p::WorktreesList::NAME => call::<p::WorktreesList>(ctx, params, worktrees::list),
         p::WorktreeRemove::NAME => call::<p::WorktreeRemove>(ctx, params, worktrees::remove),
+        // Changelists and partial commits.
+        p::ChangelistsGet::NAME => call::<p::ChangelistsGet>(ctx, params, changelists::get),
+        p::ChangelistsCreate::NAME => call::<p::ChangelistsCreate>(ctx, params, changelists::create),
+        p::ChangelistsRename::NAME => call::<p::ChangelistsRename>(ctx, params, changelists::rename),
+        p::ChangelistsDelete::NAME => call::<p::ChangelistsDelete>(ctx, params, changelists::delete),
+        p::ChangelistsSetActive::NAME => call::<p::ChangelistsSetActive>(ctx, params, changelists::set_active),
+        p::ChangelistsMovePaths::NAME => call::<p::ChangelistsMovePaths>(ctx, params, changelists::move_paths),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

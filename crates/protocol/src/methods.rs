@@ -80,6 +80,17 @@ methods! {
     WorktreesList = "worktrees.list" (RepoParams) -> Vec<Worktree>;
     /// Removes a worktree. Without `force`, refuses when it has uncommitted changes or unmerged commits.
     WorktreeRemove = "worktree.remove" (WorktreeRemoveParams) -> Empty;
+    // Changelists and partial commits.
+    /// Reads a repo's changelists, dropping paths that no longer have changes.
+    ChangelistsGet = "changelists.get" (RepoParams) -> Changelists;
+    /// Adds an empty changelist. Returns the state after the change, as do the other changelist changes.
+    ChangelistsCreate = "changelists.create" (ChangelistParams) -> Changelists;
+    ChangelistsRename = "changelists.rename" (ChangelistRenameParams) -> Changelists;
+    /// Deletes a changelist, moving its files to `move_to` or the default list. The default list can't be deleted.
+    ChangelistsDelete = "changelists.delete" (ChangelistDeleteParams) -> Changelists;
+    ChangelistsSetActive = "changelists.set_active" (ChangelistParams) -> Changelists;
+    /// Moves files to a changelist, out of whichever list held them.
+    ChangelistsMovePaths = "changelists.move_paths" (ChangelistPathsParams) -> Changelists;
 }
 
 /// Params or result with no fields.
@@ -454,4 +465,56 @@ pub struct WorktreeRemoveParams {
     pub force: bool,
     /// Also deletes the worktree's branch.
     pub delete_branch: bool,
+}
+
+/// A repo's changelists. The first list is the default one.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct Changelists {
+    /// Name of the active list. Changed files not assigned to a list are in it.
+    pub active: String,
+    pub lists: Vec<Changelist>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct Changelist {
+    /// Unique within the repo.
+    pub name: String,
+    /// The default list always exists and can't be deleted.
+    pub is_default: bool,
+    /// Files assigned to this list, relative to the repo root, sorted.
+    pub paths: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ChangelistParams {
+    pub repo: String,
+    /// Changelist name.
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ChangelistRenameParams {
+    pub repo: String,
+    pub name: String,
+    pub new_name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ChangelistDeleteParams {
+    pub repo: String,
+    pub name: String,
+    /// Where the deleted list's files go. Defaults to the default list. It also becomes the active list
+    /// when the deleted list was active.
+    #[serde(default)]
+    #[ts(optional)]
+    pub move_to: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ChangelistPathsParams {
+    pub repo: String,
+    /// Changelist name.
+    pub name: String,
+    /// Paths relative to the repo root.
+    pub paths: Vec<String>,
 }
