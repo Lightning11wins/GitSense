@@ -9,6 +9,7 @@ mod error;
 mod files;
 mod git;
 mod log;
+mod ops;
 mod paths;
 mod remote;
 mod repos;
@@ -149,6 +150,10 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::ChangelistsDelete::NAME => call::<p::ChangelistsDelete>(ctx, params, changelists::delete),
         p::ChangelistsSetActive::NAME => call::<p::ChangelistsSetActive>(ctx, params, changelists::set_active),
         p::ChangelistsMovePaths::NAME => call::<p::ChangelistsMovePaths>(ctx, params, changelists::move_paths),
+        // Operations, conflicts, comparison, commit actions.
+        p::OperationContinue::NAME => call::<p::OperationContinue>(ctx, params, ops::continue_operation),
+        p::OperationAbort::NAME => call::<p::OperationAbort>(ctx, params, ops::abort_operation),
+        p::OperationSkip::NAME => call::<p::OperationSkip>(ctx, params, ops::skip_operation),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

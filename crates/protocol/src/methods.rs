@@ -92,6 +92,15 @@ methods! {
     ChangelistsSetActive = "changelists.set_active" (ChangelistParams) -> Changelists;
     /// Moves files to a changelist, out of whichever list held them.
     ChangelistsMovePaths = "changelists.move_paths" (ChangelistPathsParams) -> Changelists;
+    // Operations, conflicts, comparison, commit actions.
+    /// Continues the merge, rebase, cherry-pick, or revert in progress, after its conflicts are resolved.
+    /// A merge is finished with a commit using git's prepared message. Fails when none is in progress, or
+    /// with the new conflicts when a rebase or cherry-pick stops again.
+    OperationContinue = "operation.continue" (RepoParams) -> Empty;
+    /// Abandons the operation in progress and restores the state from before it started.
+    OperationAbort = "operation.abort" (RepoParams) -> Empty;
+    /// Skips the current commit of a rebase, cherry-pick, or revert. Fails for a merge or when nothing is in progress.
+    OperationSkip = "operation.skip" (RepoParams) -> Empty;
 }
 
 /// Params or result with no fields.

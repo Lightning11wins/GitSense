@@ -382,4 +382,7 @@ export type Methods = {
   "changelists.delete": { params: ChangelistDeleteParams; result: Changelists };
   "changelists.set_active": { params: ChangelistParams; result: Changelists };
   "changelists.move_paths": { params: ChangelistPathsParams; result: Changelists };
+  "operation.continue": { params: RepoParams; result: Empty };
+  "operation.abort": { params: RepoParams; result: Empty };
+  "operation.skip": { params: RepoParams; result: Empty };
 };

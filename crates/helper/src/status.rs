@@ -15,7 +15,7 @@ pub fn status(ctx: &Ctx, params: RepoParams) -> Result<RepoStatus> {
     Ok(status)
 }
 
-fn operation(git_dir: &Path) -> Option<Operation> {
+pub fn operation(git_dir: &Path) -> Option<Operation> {
     let has = |name: &str| git_dir.join(name).exists();
     if has("rebase-merge") || has("rebase-apply") {
         Some(Operation::Rebase)
