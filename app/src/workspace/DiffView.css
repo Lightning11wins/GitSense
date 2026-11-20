@@ -1,0 +1,73 @@
+.diff-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-toolbar {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.diff-toolbar .spacer {
+  flex: 1;
+}
+
+.diff-sides {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.diff-message {
+  padding: 16px;
+}
+
+.diff-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.diff-host[hidden] {
+  display: none;
+}
+
+.diff-host .cm-mergeView {
+  flex: 1;
+  overflow: auto;
+}
+
+.diff-host .cm-mergeViewEditors {
+  min-height: 100%;
+}
+
+.diff-host .cm-merge-revert {
+  background: var(--bg-editor);
+  border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.diff-host .cm-merge-revert button {
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.diff-host .cm-merge-revert button:hover {
+  color: var(--text);
+}
+

@@ -1,7 +1,8 @@
 // State of one connected machine: repos, their statuses, and the Git Console.
 import { useSyncExternalStore } from "react";
 import { call, onWindowEvent, type ConnectedInfo } from "../api";
-import type { GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
+import type { FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
+import type { DiffTab } from "./DiffView";
 
 export type StatusEntry = { status?: RepoStatus; error?: string; loading: boolean };
 
@@ -14,6 +15,9 @@ export type SessionState = {
   console: GitCommandLog[];
   notices: string[];
   disconnected?: string;
+  /** Center editor tabs. */
+  tabs: DiffTab[];
+  activeTab?: string;
 };
 
 const CONSOLE_LIMIT = 500;
@@ -29,7 +33,7 @@ export class Session {
     info: ConnectedInfo,
     private reconnect: () => Promise<ConnectedInfo>,
   ) {
-    this.state = { info, repos: [], reposLoading: true, statuses: {}, console: [], notices: [] };
+    this.state = { info, repos: [], reposLoading: true, statuses: {}, console: [], notices: [], tabs: [] };
   }
 
   start() {
@@ -125,6 +129,25 @@ export class Session {
     const info = await this.reconnect();
     this.set({ info, disconnected: undefined });
     await this.loadRepos("repos.list");
+  }
+
+  /** Opens a file's diff in a center tab, reusing its tab if open. */
+  openDiff(repo: string, change: FileChange) {
+    const id = `diff:${repo}:${change.path}`;
+    const tab: DiffTab = { id, repo, path: change.path, origPath: change.orig_path };
+    const tabs = this.state.tabs.some((t) => t.id === id) ? this.state.tabs : [...this.state.tabs, tab];
+    this.set({ tabs, activeTab: id });
+  }
+
+  activateTab(id: string) {
+    this.set({ activeTab: id });
+  }
+
+  closeTab(id: string) {
+    const index = this.state.tabs.findIndex((t) => t.id === id);
+    const tabs = this.state.tabs.filter((t) => t.id !== id);
+    const activeTab = this.state.activeTab === id ? tabs[Math.min(index, tabs.length - 1)]?.id : this.state.activeTab;
+    this.set({ tabs, activeTab });
   }
 
   clearConsole() {

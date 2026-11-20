@@ -6,6 +6,7 @@ import { CommitPanel } from "./CommitPanel";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
+import { CenterTabs } from "./CenterTabs";
 import "./Workspace.css";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -60,7 +61,7 @@ export function Workspace({ session }: { session: Session }) {
               </>
             )}
             <div className="center">
-              <div className="center-empty secondary">Double-click a change to see its diff</div>
+              <CenterTabs session={session} />
             </div>
           </div>
           {bottomTab && (

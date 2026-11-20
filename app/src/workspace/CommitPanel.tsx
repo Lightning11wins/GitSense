@@ -70,7 +70,13 @@ export function CommitPanel({ session }: { session: Session }) {
                   group.files.map((file) => {
                     const fileKey = `${groupKey}/${file.path}`;
                     return (
-                      <Row key={fileKey} depth={2} selected={selected === fileKey} onSelect={() => setSelected(fileKey)}>
+                      <Row
+                        key={fileKey}
+                        depth={2}
+                        selected={selected === fileKey}
+                        onSelect={() => setSelected(fileKey)}
+                        onOpen={() => session.openDiff(group.repo.path, file)}
+                      >
                         <FileText size={14} className="secondary" />
                         <span className={`label status-${file.kind}`} title={file.orig_path ? `Renamed from ${file.orig_path}` : undefined}>
                           {baseName(file.path)}
@@ -131,18 +137,20 @@ type RowProps = {
   /** Whether the node is expanded; undefined for leaves. */
   chevron?: boolean;
   onToggle?: () => void;
+  /** Opens a leaf, on double-click. */
+  onOpen?: () => void;
   selected: boolean;
   onSelect: () => void;
   children: React.ReactNode;
 };
 
-function Row({ depth, chevron, onToggle, selected, onSelect, children }: RowProps) {
+function Row({ depth, chevron, onToggle, onOpen, selected, onSelect, children }: RowProps) {
   return (
     <div
       className={`tree-row ${selected ? "selected" : ""}`}
       style={{ paddingLeft: 4 + depth * 16 }}
       onMouseDown={onSelect}
-      onDoubleClick={onToggle}
+      onDoubleClick={onOpen ?? onToggle}
     >
       <span
         className="chevron"
