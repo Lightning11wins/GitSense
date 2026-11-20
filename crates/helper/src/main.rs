@@ -1,6 +1,8 @@
 //! `gitsense-helper`: runs on the machine being managed and serves the
 //! GitSense protocol on stdin/stdout.
 
+mod changes;
+mod commit;
 mod error;
 mod files;
 mod git;
@@ -110,6 +112,13 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::Status::NAME => call::<p::Status>(ctx, params, status::status),
         p::FileRead::NAME => call::<p::FileRead>(ctx, params, files::read),
         p::FileWrite::NAME => call::<p::FileWrite>(ctx, params, files::write),
+        p::Commit::NAME => call::<p::Commit>(ctx, params, commit::commit),
+        p::CommitMessage::NAME => call::<p::CommitMessage>(ctx, params, commit::message),
+        p::Rollback::NAME => call::<p::Rollback>(ctx, params, changes::rollback),
+        p::FilesAdd::NAME => call::<p::FilesAdd>(ctx, params, changes::add),
+        p::FilesDelete::NAME => call::<p::FilesDelete>(ctx, params, changes::delete_files),
+        p::IgnoreTargets::NAME => call::<p::IgnoreTargets>(ctx, params, changes::ignore_targets),
+        p::IgnoreAdd::NAME => call::<p::IgnoreAdd>(ctx, params, changes::ignore_add),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

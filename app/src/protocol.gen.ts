@@ -2,6 +2,23 @@
 
 export type ChangeKind = "added" | "modified" | "deleted" | "renamed" | "untracked" | "conflicted";
 
+export type CommitParams = { repo: string, 
+/**
+ * Files to commit, relative to the repo root. Renames need both paths. Untracked files are added.
+ * May be empty when amending, to change only the message.
+ */
+paths: Array<string>, message: string, 
+/**
+ * Replaces HEAD instead of adding a commit on top of it.
+ */
+amend: boolean, };
+
+export type CommitResult = { 
+/**
+ * Hash of the new commit.
+ */
+hash: string, };
+
 export type Empty = Record<symbol, never>;
 
 export type Event = { "kind": "ready", helper_version: string, git_version: string, home: string, } | { "kind": "repo_changed", repo: string, } | { "kind": "git_command" } & GitCommandLog | { "kind": "progress", request_id: number, text: string, } | { "kind": "notice", text: string, };
@@ -40,9 +57,23 @@ output: string, };
 
 export type HelperMessage = { "type": "response", id: number, result: unknown, } | { "type": "error", id: number, message: string, } | { "type": "event", event: Event, };
 
+export type IgnoreAddParams = { repo: string, file: IgnoreFile, 
+/**
+ * Paths relative to the repo root. Each must be inside the ignore file's dir.
+ */
+paths: Array<string>, };
+
+export type IgnoreFile = { "kind": "gitignore", dir: string, } | { "kind": "exclude" };
+
 export type Operation = "merge" | "rebase" | "cherry_pick" | "revert";
 
 export type PathParams = { path: string, };
+
+export type PathsParams = { repo: string, 
+/**
+ * Paths relative to the repo root.
+ */
+paths: Array<string>, };
 
 export type Repo = { 
 /**
@@ -78,6 +109,18 @@ head: string | null, upstream: string | null, ahead: number, behind: number, ope
  */
 changes: Array<FileChange>, };
 
+export type RevParams = { repo: string, rev: string, };
+
+export type RollbackParams = { repo: string, 
+/**
+ * Tracked files, relative to the repo root. Renames need both paths.
+ */
+paths: Array<string>, 
+/**
+ * Deletes files that are not in HEAD instead of leaving them untracked.
+ */
+delete_added: boolean, };
+
 export type SetHiddenParams = { repo: string, hidden: boolean, };
 
 export type Methods = {
@@ -88,4 +131,11 @@ export type Methods = {
   "status": { params: RepoParams; result: RepoStatus };
   "file.read": { params: FileReadParams; result: FileContent };
   "file.write": { params: FileWriteParams; result: Empty };
+  "commit": { params: CommitParams; result: CommitResult };
+  "commit.message": { params: RevParams; result: string };
+  "rollback": { params: RollbackParams; result: Empty };
+  "files.add": { params: PathsParams; result: Empty };
+  "files.delete": { params: PathsParams; result: Empty };
+  "ignore.targets": { params: PathsParams; result: Array<IgnoreFile> };
+  "ignore.add": { params: IgnoreAddParams; result: Empty };
 };

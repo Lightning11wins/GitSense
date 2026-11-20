@@ -28,7 +28,6 @@ pub struct Git<'a> {
     args: Vec<OsString>,
     logged: bool,
     stdin: Option<Vec<u8>>,
-    env: Vec<(OsString, OsString)>,
 }
 
 pub struct Output {
@@ -53,7 +52,7 @@ pub fn git<'a>(ctx: &Ctx, repo: &'a Path) -> Git<'a> {
 
 impl<'a> Git<'a> {
     pub fn new(out: HelperOutput, repo: &'a Path) -> Self {
-        Git { out, repo, args: Vec::new(), logged: false, stdin: None, env: Vec::new() }
+        Git { out, repo, args: Vec::new(), logged: false, stdin: None }
     }
 
     pub fn arg(mut self, arg: impl Into<OsString>) -> Self {
@@ -73,11 +72,6 @@ impl<'a> Git<'a> {
 
     pub fn stdin(mut self, input: impl Into<Vec<u8>>) -> Self {
         self.stdin = Some(input.into());
-        self
-    }
-
-    pub fn env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
-        self.env.push((key.into(), value.into()));
         self
     }
 
@@ -104,6 +98,7 @@ impl<'a> Git<'a> {
             .args(["-c", "core.quotepath=false", "-c", "color.ui=false"])
             .args(&self.args)
             .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_LITERAL_PATHSPECS", "1")
             .env("LC_ALL", "C")
             .stdin(if self.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
@@ -111,9 +106,6 @@ impl<'a> Git<'a> {
         if !self.logged {
             // Read-only queries must not take the index lock from the user's own git commands.
             cmd.env("GIT_OPTIONAL_LOCKS", "0");
-        }
-        for (key, value) in &self.env {
-            cmd.env(key, value);
         }
         let mut child = cmd.spawn().map_err(|e| Error::new(format!("Failed to start '{}': {e}", self.display())))?;
         if let Some(input) = &self.stdin {

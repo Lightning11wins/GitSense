@@ -35,6 +35,21 @@ methods! {
     FileRead = "file.read" (FileReadParams) -> FileContent;
     /// Writes a working-tree file.
     FileWrite = "file.write" (FileWriteParams) -> Empty;
+    /// Commits the working-tree content of whole files. Other changes, staged or not, stay as they are.
+    Commit = "commit" (CommitParams) -> CommitResult;
+    /// Reads a commit's full message.
+    CommitMessage = "commit.message" (RevParams) -> String;
+    /// Reverts tracked files to HEAD. Files not in HEAD become untracked, or are deleted with `delete_added`.
+    Rollback = "rollback" (RollbackParams) -> Empty;
+    /// Starts tracking untracked files.
+    FilesAdd = "files.add" (PathsParams) -> Empty;
+    /// Deletes working-tree files.
+    FilesDelete = "files.delete" (PathsParams) -> Empty;
+    /// Lists ignore files for the given paths: the root `.gitignore`, other existing `.gitignore` files whose
+    /// dir holds every path, from the root down, then `info/exclude`.
+    IgnoreTargets = "ignore.targets" (PathsParams) -> Vec<IgnoreFile>;
+    /// Adds the given paths to an ignore file, creating it if needed.
+    IgnoreAdd = "ignore.add" (IgnoreAddParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -50,6 +65,19 @@ pub struct PathParams {
 pub struct RepoParams {
     /// Absolute path of the repo's working tree root.
     pub repo: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct PathsParams {
+    pub repo: String,
+    /// Paths relative to the repo root.
+    pub paths: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RevParams {
+    pub repo: String,
+    pub rev: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
@@ -147,4 +175,47 @@ pub struct FileWriteParams {
     pub repo: String,
     pub path: String,
     pub text: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CommitParams {
+    pub repo: String,
+    /// Files to commit, relative to the repo root. Renames need both paths. Untracked files are added.
+    /// May be empty when amending, to change only the message.
+    pub paths: Vec<String>,
+    pub message: String,
+    /// Replaces HEAD instead of adding a commit on top of it.
+    pub amend: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CommitResult {
+    /// Hash of the new commit.
+    pub hash: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RollbackParams {
+    pub repo: String,
+    /// Tracked files, relative to the repo root. Renames need both paths.
+    pub paths: Vec<String>,
+    /// Deletes files that are not in HEAD instead of leaving them untracked.
+    pub delete_added: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum IgnoreFile {
+    /// A `.gitignore` in `dir`, relative to the repo root ("" for the root).
+    Gitignore { dir: String },
+    /// The repo's `info/exclude`, which is not shared with other clones.
+    Exclude,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct IgnoreAddParams {
+    pub repo: String,
+    pub file: IgnoreFile,
+    /// Paths relative to the repo root. Each must be inside the ignore file's dir.
+    pub paths: Vec<String>,
 }
