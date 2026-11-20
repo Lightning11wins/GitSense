@@ -305,6 +305,10 @@ head: string | null, upstream: string | null, ahead: number, behind: number, ope
  */
 changes: Array<FileChange>, };
 
+export type ResetMode = "soft" | "mixed" | "hard" | "keep";
+
+export type ResetParams = { repo: string, rev: string, mode: ResetMode, };
+
 export type RevParams = { repo: string, rev: string, };
 
 export type RevsParams = { repo: string, 
@@ -393,4 +397,5 @@ export type Methods = {
   "operation.skip": { params: RepoParams; result: Empty };
   "cherry_pick": { params: RevsParams; result: Empty };
   "revert": { params: RevsParams; result: Empty };
+  "reset": { params: ResetParams; result: Empty };
 };

@@ -156,6 +156,7 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::OperationSkip::NAME => call::<p::OperationSkip>(ctx, params, ops::skip_operation),
         p::CherryPick::NAME => call::<p::CherryPick>(ctx, params, ops::cherry_pick),
         p::Revert::NAME => call::<p::Revert>(ctx, params, ops::revert),
+        p::Reset::NAME => call::<p::Reset>(ctx, params, ops::reset),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

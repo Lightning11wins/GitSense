@@ -107,6 +107,9 @@ methods! {
     /// Reverts commits on the current branch in the given order, with git's default messages. A conflict leaves
     /// the revert in progress and fails with a message naming the number of conflicted files.
     Revert = "revert" (RevsParams) -> Empty;
+    /// Moves the current branch to a revision. `soft` keeps the index and working tree, `mixed` resets the index,
+    /// `hard` resets both, and `keep` resets both but fails if that would lose local changes.
+    Reset = "reset" (ResetParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -555,4 +558,20 @@ pub struct RevsParams {
     pub repo: String,
     /// Revisions to apply, in order. Must not be empty.
     pub revs: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ResetParams {
+    pub repo: String,
+    pub rev: String,
+    pub mode: ResetMode,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ResetMode {
+    Soft,
+    Mixed,
+    Hard,
+    Keep,
 }

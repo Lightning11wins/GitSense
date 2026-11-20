@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use gitsense_protocol::{Empty, Operation, RepoParams, RevsParams};
+use gitsense_protocol::{Empty, Operation, RepoParams, ResetMode, ResetParams, RevsParams};
 
 use crate::git::{Git, git};
 use crate::repos::GitDirs;
@@ -97,5 +97,16 @@ fn apply_commits(ctx: &Ctx, params: RevsParams, command: &str, options: &[&str])
     let repo = Path::new(&params.repo);
     let cmd = git(ctx, repo).arg(command).args(options).args(&params.revs);
     run_stoppable(ctx, repo, cmd, &format!("{command} '{}' in '{}'", params.revs.join(" "), params.repo))?;
+    Ok(Empty {})
+}
+
+pub fn reset(ctx: &Ctx, params: ResetParams) -> Result<Empty> {
+    let mode = match params.mode {
+        ResetMode::Soft => "--soft",
+        ResetMode::Mixed => "--mixed",
+        ResetMode::Hard => "--hard",
+        ResetMode::Keep => "--keep",
+    };
+    git(ctx, Path::new(&params.repo)).args(["reset", mode, "--end-of-options", &params.rev, "--"]).logged().run()?;
     Ok(Empty {})
 }

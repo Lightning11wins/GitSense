@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 
 use common::Machine;
 use gitsense_protocol::{
-    CherryPick, Operation, OperationAbort, OperationContinue, OperationSkip, RepoParams, Revert, RevsParams, Status,
+    CherryPick, Operation, OperationAbort, OperationContinue, OperationSkip, RepoParams, Reset, ResetMode, ResetParams,
+    Revert, RevsParams, Status,
 };
 
 fn s(path: &Path) -> String {
@@ -207,4 +208,51 @@ async fn reverts_commits_with_default_messages_and_stops_on_conflict() {
     assert_eq!(operation(&session, &repo).await, Some(Operation::Revert));
     session.conn.call::<OperationSkip>(repo_params(&repo)).await.unwrap();
     assert_eq!(operation(&session, &repo).await, None);
+}
+
+#[tokio::test]
+async fn resets_in_each_mode() {
+    let machine = Machine::new();
+    let repo = machine.repo("app");
+    let first = commit_file(&machine, &repo, "a.txt", "one\n");
+    let session = machine.connect_local().await;
+    let reset = |rev: &str, mode| ResetParams { repo: s(&repo), rev: rev.into(), mode };
+    let porcelain = || machine.git(&repo, &["status", "--porcelain"]);
+
+    commit_file(&machine, &repo, "b.txt", "two\n");
+    session.conn.call::<Reset>(reset(&first, ResetMode::Soft)).await.unwrap();
+    assert_eq!(machine.git(&repo, &["rev-parse", "HEAD"]).trim(), first);
+    assert_eq!(porcelain(), "A  b.txt\n");
+
+    session.conn.call::<Reset>(reset("HEAD", ResetMode::Mixed)).await.unwrap();
+    assert_eq!(porcelain(), "?? b.txt\n");
+
+    machine.git(&repo, &["add", "b.txt"]);
+    session.conn.call::<Reset>(reset("HEAD", ResetMode::Hard)).await.unwrap();
+    assert_eq!(porcelain(), "");
+    assert!(!repo.join("b.txt").exists());
+
+    // Keep carries unrelated local changes along, and refuses to overwrite changed files.
+    let second = commit_file(&machine, &repo, "a.txt", "two\n");
+    std::fs::write(repo.join("README.md"), "local\n").unwrap();
+    session.conn.call::<Reset>(reset(&first, ResetMode::Keep)).await.unwrap();
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "one\n");
+    assert_eq!(std::fs::read_to_string(repo.join("README.md")).unwrap(), "local\n");
+    machine.git(&repo, &["reset", "-q", "--hard", &second]);
+    std::fs::write(repo.join("a.txt"), "local\n").unwrap();
+    session.conn.call::<Reset>(reset(&first, ResetMode::Keep)).await.unwrap_err();
+    assert_eq!(machine.git(&repo, &["rev-parse", "HEAD"]).trim(), second);
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "local\n");
+}
+
+#[tokio::test]
+async fn reset_refuses_unknown_and_option_like_revisions() {
+    let machine = Machine::new();
+    let repo = machine.repo("app");
+    let session = machine.connect_local().await;
+    for rev in ["no-such-rev", "--hard"] {
+        let params = ResetParams { repo: s(&repo), rev: rev.into(), mode: ResetMode::Hard };
+        let err = session.conn.call::<Reset>(params).await.unwrap_err();
+        assert!(err.to_string().starts_with("Failed to ") && err.to_string().contains(rev), "{err}");
+    }
 }
