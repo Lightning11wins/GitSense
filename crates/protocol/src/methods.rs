@@ -52,6 +52,10 @@ methods! {
     IgnoreAdd = "ignore.add" (IgnoreAddParams) -> Empty;
     /// Lists files a commit changed, compared with its first parent.
     CommitFiles = "commit.files" (RevParams) -> Vec<FileChange>;
+    /// Lists commits newest first, in an order where children come before their parents.
+    Log = "log" (LogParams) -> Vec<LogCommit>;
+    /// Lists files that differ between two revisions.
+    DiffFiles = "diff.files" (DiffFilesParams) -> Vec<FileChange>;
     /// Lists local and remote-tracking branches.
     BranchesList = "branches.list" (RepoParams) -> Branches;
     Checkout = "checkout" (CheckoutParams) -> Empty;
@@ -367,6 +371,65 @@ pub struct CommitInfo {
     /// Author date in seconds since the Unix epoch.
     pub author_time: i64,
     pub subject: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct LogParams {
+    pub repo: String,
+    /// Revisions to list commits from; all branches, remote branches, tags, and HEAD when empty.
+    pub revs: Vec<String>,
+    /// Text in the author's name or email.
+    pub author: Option<String>,
+    /// Text in the message, or the start of the hash.
+    pub text: Option<String>,
+    /// Earliest commit date, in seconds since the Unix epoch.
+    pub since: Option<i64>,
+    /// Latest commit date, in seconds since the Unix epoch.
+    pub until: Option<i64>,
+    /// Only commits that changed these paths.
+    pub paths: Vec<String>,
+    /// Commits to skip, for paging.
+    pub skip: u32,
+    pub limit: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct LogCommit {
+    pub hash: String,
+    pub parents: Vec<String>,
+    pub author_name: String,
+    pub author_email: String,
+    /// Author date in seconds since the Unix epoch.
+    pub author_time: i64,
+    /// Commit date in seconds since the Unix epoch.
+    pub commit_time: i64,
+    pub subject: String,
+    /// HEAD points at this commit.
+    pub head: bool,
+    pub refs: Vec<LogRef>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct LogRef {
+    pub kind: RefKind,
+    /// Short name, like `main`, `origin/main`, or `v1.0`.
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum RefKind {
+    Local,
+    Remote,
+    Tag,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct DiffFilesParams {
+    pub repo: String,
+    /// None compares `to` with the empty tree.
+    pub from: Option<String>,
+    pub to: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]

@@ -124,6 +124,8 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::IgnoreTargets::NAME => call::<p::IgnoreTargets>(ctx, params, changes::ignore_targets),
         p::IgnoreAdd::NAME => call::<p::IgnoreAdd>(ctx, params, changes::ignore_add),
         p::CommitFiles::NAME => call::<p::CommitFiles>(ctx, params, commit::files),
+        p::Log::NAME => call::<p::Log>(ctx, params, log::log),
+        p::DiffFiles::NAME => call::<p::DiffFiles>(ctx, params, log::diff_files),
         p::BranchesList::NAME => call::<p::BranchesList>(ctx, params, branches::list),
         p::Checkout::NAME => call::<p::Checkout>(ctx, params, branches::checkout),
         p::BranchCreate::NAME => call::<p::BranchCreate>(ctx, params, branches::create),

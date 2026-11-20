@@ -59,6 +59,12 @@ export type CommitResult = {
  */
 hash: string, };
 
+export type DiffFilesParams = { repo: string, 
+/**
+ * None compares `to` with the empty tree.
+ */
+from: string | null, to: string, };
+
 export type Empty = Record<symbol, never>;
 
 export type Event = { "kind": "ready", helper_version: string, git_version: string, home: string, } | { "kind": "repo_changed", repo: string, } | { "kind": "git_command" } & GitCommandLog | { "kind": "progress", request_id: number, text: string, } | { "kind": "notice", text: string, };
@@ -123,6 +129,56 @@ current: boolean,
  */
 worktree: string | null, };
 
+export type LogCommit = { hash: string, parents: Array<string>, author_name: string, author_email: string, 
+/**
+ * Author date in seconds since the Unix epoch.
+ */
+author_time: number, 
+/**
+ * Commit date in seconds since the Unix epoch.
+ */
+commit_time: number, subject: string, 
+/**
+ * HEAD points at this commit.
+ */
+head: boolean, refs: Array<LogRef>, };
+
+export type LogParams = { repo: string, 
+/**
+ * Revisions to list commits from; all branches, remote branches, tags, and HEAD when empty.
+ */
+revs: Array<string>, 
+/**
+ * Text in the author's name or email.
+ */
+author: string | null, 
+/**
+ * Text in the message, or the start of the hash.
+ */
+text: string | null, 
+/**
+ * Earliest commit date, in seconds since the Unix epoch.
+ */
+since: number | null, 
+/**
+ * Latest commit date, in seconds since the Unix epoch.
+ */
+until: number | null, 
+/**
+ * Only commits that changed these paths.
+ */
+paths: Array<string>, 
+/**
+ * Commits to skip, for paging.
+ */
+skip: number, limit: number, };
+
+export type LogRef = { kind: RefKind, 
+/**
+ * Short name, like `main`, `origin/main`, or `v1.0`.
+ */
+name: string, };
+
 export type Operation = "merge" | "rebase" | "cherry_pick" | "revert";
 
 export type PathParams = { path: string, };
@@ -146,6 +202,8 @@ branch: string, remote: string,
 remote_branch: string, };
 
 export type RebaseParams = { repo: string, onto: string, branch: string | null, };
+
+export type RefKind = "local" | "remote" | "tag";
 
 export type RemoteBranch = { remote: string, 
 /**
@@ -241,6 +299,8 @@ export type Methods = {
   "ignore.targets": { params: PathsParams; result: Array<IgnoreFile> };
   "ignore.add": { params: IgnoreAddParams; result: Empty };
   "commit.files": { params: RevParams; result: Array<FileChange> };
+  "log": { params: LogParams; result: Array<LogCommit> };
+  "diff.files": { params: DiffFilesParams; result: Array<FileChange> };
   "branches.list": { params: RepoParams; result: Branches };
   "checkout": { params: CheckoutParams; result: Empty };
   "branch.create": { params: BranchCreateParams; result: Empty };

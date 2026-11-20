@@ -56,7 +56,7 @@ pub fn files(ctx: &Ctx, params: RevParams) -> Result<Vec<FileChange>> {
 }
 
 /// Parses `git diff --name-status -z` output.
-fn parse_name_status(text: &str) -> Result<Vec<FileChange>> {
+pub fn parse_name_status(text: &str) -> Result<Vec<FileChange>> {
     let mut fields = text.split('\0').filter(|f| !f.is_empty());
     let mut changes = Vec::new();
     while let Some(status) = fields.next() {
