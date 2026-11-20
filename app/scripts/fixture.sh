@@ -32,6 +32,25 @@ printf 'scratch\n' > scratch.txt
 repo code/web
 printf 'export function greet(name: string) {\n  return `Hello, ${name}`;\n}\n' > index.ts
 git add . && git commit -q -m "Start the web app."
+git init -q --bare "$home/remotes/web.git"
+git remote add origin "$home/remotes/web.git"
+git push -q -u origin main
+git switch -q -c release
+printf 'v1\n' > VERSION
+git add VERSION && git commit -q -m "Prepare the release."
+git push -q origin release
+git switch -q main
+git branch -q -D release
+git switch -q -c feature/login
+printf 'export const login = () => true;\n' > login.ts
+git add login.ts && git commit -q -m "Add login."
+git switch -q main
+printf 'node_modules/\n' > .gitignore
+git add .gitignore && git commit -q -m "Ignore dependencies."
+git worktree add -q -b agent "$home/code/web-agent"
+printf 'agent\n' > "$home/code/web-agent/AGENT.md"
+git -C "$home/code/web-agent" add AGENT.md
+git -C "$home/code/web-agent" commit -q -m "Add agent notes."
 printf 'export function greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n' > index.ts
 
 echo "$home"
