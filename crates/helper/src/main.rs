@@ -1,0 +1,124 @@
+//! `gitsense-helper`: runs on the machine being managed and serves the
+//! GitSense protocol on stdin/stdout.
+
+mod error;
+mod files;
+mod git;
+mod paths;
+mod repos;
+mod status;
+mod watch;
+
+use std::io::{BufRead, Write};
+use std::sync::{Arc, Mutex};
+
+use gitsense_protocol::{Event, HelperMessage, Method, Request};
+use serde_json::Value;
+
+pub use error::{Error, Result};
+
+/// Shared state for request handlers.
+pub struct Ctx {
+    pub out: Output,
+    pub paths: paths::Paths,
+    pub repos: Mutex<repos::Store>,
+    pub watcher: Mutex<Option<watch::Watcher>>,
+}
+
+impl Ctx {
+    pub fn send(&self, message: &HelperMessage) {
+        self.out.send(message);
+    }
+
+    pub fn event(&self, event: Event) {
+        self.out.event(event);
+    }
+}
+
+/// The helper's stdout, shared by request threads and the file watcher.
+#[derive(Clone)]
+pub struct Output(Arc<Mutex<std::io::Stdout>>);
+
+impl Output {
+    pub fn send(&self, message: &HelperMessage) {
+        let mut line = serde_json::to_string(message).expect("Failed to serialize a helper message");
+        line.push('\n');
+        let mut out = self.0.lock().unwrap();
+        // A closed stdout means the app is gone; the stdin loop ends soon after.
+        let _ = out.write_all(line.as_bytes()).and_then(|()| out.flush());
+    }
+
+    pub fn event(&self, event: Event) {
+        self.send(&HelperMessage::Event { event });
+    }
+}
+
+fn main() {
+    let paths = match paths::Paths::from_env() {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("gitsense-helper: {e}");
+            std::process::exit(1);
+        }
+    };
+    paths.prune_old_helpers();
+    let ctx = Arc::new(Ctx {
+        out: Output(Arc::new(Mutex::new(std::io::stdout()))),
+        repos: Mutex::new(repos::Store::load(&paths)),
+        paths,
+        watcher: Mutex::new(None),
+    });
+
+    ctx.event(Event::Ready {
+        helper_version: env!("CARGO_PKG_VERSION").to_string(),
+        git_version: git::version().unwrap_or_else(|e| format!("unknown ({e})")),
+        home: ctx.paths.home.display().to_string(),
+    });
+
+    for line in std::io::stdin().lock().lines() {
+        let Ok(line) = line else { break };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let request: Request = match serde_json::from_str(&line) {
+            Ok(request) => request,
+            Err(e) => {
+                eprintln!("gitsense-helper: Failed to parse request {line:?}: {e}");
+                continue;
+            }
+        };
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let id = request.id;
+            let message = match dispatch(&ctx, request) {
+                Ok(result) => HelperMessage::Response { id, result },
+                Err(e) => HelperMessage::Error { id, message: e.to_string() },
+            };
+            ctx.send(&message);
+        });
+    }
+}
+
+fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
+    use gitsense_protocol as p;
+    let params = request.params;
+    match request.method.as_str() {
+        p::ReposList::NAME => call::<p::ReposList>(ctx, params, repos::list),
+        p::ReposScan::NAME => call::<p::ReposScan>(ctx, params, repos::scan),
+        p::ReposAdd::NAME => call::<p::ReposAdd>(ctx, params, repos::add),
+        p::ReposSetHidden::NAME => call::<p::ReposSetHidden>(ctx, params, repos::set_hidden),
+        p::Status::NAME => call::<p::Status>(ctx, params, status::status),
+        p::FileRead::NAME => call::<p::FileRead>(ctx, params, files::read),
+        p::FileWrite::NAME => call::<p::FileWrite>(ctx, params, files::write),
+        other => Err(Error::new(format!("Failed to find method '{other}'."))),
+    }
+}
+
+fn call<M: Method>(ctx: &Ctx, params: Value, handler: fn(&Ctx, M::Params) -> Result<M::Result>) -> Result<Value> {
+    // Methods without params may be sent with `params` omitted.
+    let params = if params.is_null() { Value::Object(Default::default()) } else { params };
+    let params: M::Params = serde_json::from_value(params)
+        .map_err(|e| Error::new(format!("Failed to parse params for '{}': {e}", M::NAME)))?;
+    let result = handler(ctx, params)?;
+    Ok(serde_json::to_value(result).expect("Failed to serialize a result"))
+}
