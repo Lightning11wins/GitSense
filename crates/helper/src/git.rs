@@ -21,13 +21,15 @@ pub fn version() -> Result<String> {
 
 /// A git command in a repo. Commands are quiet by default; [`Git::logged`]
 /// reports them to the Git Console, for commands that change the repo or
-/// talk to a remote.
+/// talk to a remote. Git never prompts or opens an editor: messages it would
+/// ask for are left as git's defaults unless the command supplies them.
 pub struct Git<'a> {
     out: HelperOutput,
     repo: &'a Path,
     args: Vec<OsString>,
     logged: bool,
     stdin: Option<Vec<u8>>,
+    env: Vec<(OsString, OsString)>,
 }
 
 pub struct Output {
@@ -52,7 +54,7 @@ pub fn git<'a>(ctx: &Ctx, repo: &'a Path) -> Git<'a> {
 
 impl<'a> Git<'a> {
     pub fn new(out: HelperOutput, repo: &'a Path) -> Self {
-        Git { out, repo, args: Vec::new(), logged: false, stdin: None }
+        Git { out, repo, args: Vec::new(), logged: false, stdin: None, env: Vec::new() }
     }
 
     pub fn arg(mut self, arg: impl Into<OsString>) -> Self {
@@ -67,6 +69,12 @@ impl<'a> Git<'a> {
 
     pub fn logged(mut self) -> Self {
         self.logged = true;
+        self
+    }
+
+    /// Sets an environment variable for this command, overriding the defaults.
+    pub fn env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+        self.env.push((key.into(), value.into()));
         self
     }
 
@@ -100,6 +108,7 @@ impl<'a> Git<'a> {
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_LITERAL_PATHSPECS", "1")
             .env("LC_ALL", "C")
+            .env("GIT_EDITOR", "true")
             .stdin(if self.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -107,6 +116,7 @@ impl<'a> Git<'a> {
             // Read-only queries must not take the index lock from the user's own git commands.
             cmd.env("GIT_OPTIONAL_LOCKS", "0");
         }
+        cmd.envs(self.env.iter().map(|(k, v)| (k, v)));
         let mut child = cmd.spawn().map_err(|e| Error::new(format!("Failed to start '{}': {e}", self.display())))?;
         if let Some(input) = &self.stdin {
             let mut stdin = child.stdin.take().expect("stdin is piped");
