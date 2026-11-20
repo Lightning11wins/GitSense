@@ -3,10 +3,19 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct Settings {
     /// Machine id reopened on launch.
     pub last_machine: Option<String>,
+    /// Minutes between background fetches of every repo, or 0 for never.
+    pub auto_fetch_minutes: u32,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { last_machine: None, auto_fetch_minutes: 5 }
+    }
 }
 
 /// Client settings, saved as JSON in the app's config dir.

@@ -247,17 +247,10 @@ export function CommitPanel({ session }: { session: Session }) {
     e.preventDefault();
   }
 
-  // Ctrl+K focuses the commit message, as in IntelliJ.
+  const commitFocusRequests = useSession(session, (s) => s.commitFocusRequests);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        messageRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    if (commitFocusRequests > 0) messageRef.current?.focus();
+  }, [commitFocusRequests]);
 
   async function toggleAmend(value: boolean) {
     setAmend(value);
@@ -289,7 +282,7 @@ export function CommitPanel({ session }: { session: Session }) {
           ? "Committing..."
           : undefined;
 
-  async function commit() {
+  async function commit(andPush = false) {
     if (commitBlocker) return;
     setBusy(true);
     let count = 0;
@@ -302,6 +295,7 @@ export function CommitPanel({ session }: { session: Session }) {
       setMessage("");
       setAmend(false);
       setBeforeAmend(undefined);
+      if (andPush) session.openPush();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -386,16 +380,24 @@ export function CommitPanel({ session }: { session: Session }) {
             if (e.ctrlKey && e.key === "Enter") {
               e.preventDefault();
               commit();
+            } else if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "k") {
+              e.preventDefault();
+              commit(true);
             }
           }}
         />
         {error && <div className="error-text commit-error">{error}</div>}
         <div className="commit-buttons">
-          <button className="button primary" disabled={!!commitBlocker} title={commitBlocker} onClick={commit}>
+          <button className="button primary" disabled={!!commitBlocker} title={commitBlocker} onClick={() => commit()}>
             {amend ? "Amend Commit" : "Commit"}
           </button>
-          <button className="button" disabled title="Not available yet">
-            Commit and Push...
+          <button
+            className="button"
+            disabled={!!commitBlocker}
+            title={commitBlocker ?? "Commit and Push (Ctrl+Alt+K)"}
+            onClick={() => commit(true)}
+          >
+            {amend ? "Amend Commit and Push..." : "Commit and Push..."}
           </button>
         </div>
       </div>

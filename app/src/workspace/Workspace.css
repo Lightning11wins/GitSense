@@ -264,3 +264,41 @@
   overflow: auto;
   padding-bottom: 4px;
 }
+
+.update-icon {
+  color: var(--status-modified);
+}
+
+.commit-icon {
+  color: var(--status-added);
+}
+
+.status-bar .task {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.popup-search {
+  margin: 0 8px 6px;
+  height: 28px;
+  padding: 0 8px;
+}
+
+.popup-item.active:not(:disabled) {
+  background: var(--bg-selected);
+}
+
+.current-branch {
+  color: var(--warning);
+}

@@ -1,17 +1,25 @@
 import { useState } from "react";
-import { ChevronDown, FolderGit2, GitBranch, Server } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, GitBranch, RefreshCw, Server } from "lucide-react";
 import { newWindow } from "../api";
 import { below, Popup } from "./Popup";
 import { RepoManager } from "./RepoManager";
+import { BranchesPopup } from "./BranchesPopup";
+import { SettingsDialog } from "./SettingsDialog";
 import { useSession, type Session } from "./session";
 import { repoName } from "./repos";
 
-type Open = { kind: "machine" | "repos"; at: { x: number; y: number } } | { kind: "manage" } | null;
+type Point = { x: number; y: number };
+type Open =
+  | { kind: "machine" | "repos"; at: Point }
+  | { kind: "branches"; repo: string; at: Point }
+  | { kind: "manage" | "settings" }
+  | null;
 
-export function TopBar({ session }: { session: Session }) {
+export function TopBar({ session, onCommit }: { session: Session; onCommit: () => void }) {
   const info = useSession(session, (s) => s.info);
   const repos = useSession(session, (s) => s.repos);
   const statuses = useSession(session, (s) => s.statuses);
+  const settings = useSession(session, (s) => s.settings);
   const [open, setOpen] = useState<Open>(null);
   const close = () => setOpen(null);
   const visible = repos.filter((r) => !r.hidden);
@@ -31,6 +39,15 @@ export function TopBar({ session }: { session: Session }) {
         <ChevronDown size={14} className="secondary" />
       </button>
       <div className="spacer" />
+      <button className="icon-button" title="Update Project (Ctrl+T)" onClick={() => session.updateProject()}>
+        <ArrowDownLeft size={18} className="update-icon" />
+      </button>
+      <button className="icon-button" title="Commit (Ctrl+K)" onClick={onCommit}>
+        <Check size={18} className="commit-icon" />
+      </button>
+      <button className="icon-button" title="Push (Ctrl+Shift+K)" onClick={() => session.openPush()}>
+        <ArrowUpRight size={18} className="commit-icon" />
+      </button>
 
       {open?.kind === "machine" && (
         <Popup at={open.at} onClose={close}>
@@ -44,6 +61,9 @@ export function TopBar({ session }: { session: Session }) {
             <button className="popup-item" onClick={() => (close(), session.loadRepos("repos.scan"))}>
               Rescan Home Directory
             </button>
+            <button className="popup-item" disabled={!settings} onClick={() => setOpen({ kind: "settings" })}>
+              Settings...
+            </button>
             <div className="popup-separator" />
             <div className="popup-section">
               Helper {info.helper_version} · git {info.git_version} · {info.home}
@@ -53,22 +73,36 @@ export function TopBar({ session }: { session: Session }) {
       )}
       {open?.kind === "repos" && (
         <Popup at={open.at} onClose={close} width={420}>
-          <div className="popup-title">Repositories</div>
+          <div className="popup-title row">
+            Repositories
+            <span className="grow" />
+            <button className="icon-button" title="Fetch All" onClick={() => (close(), session.fetchAll())}>
+              <RefreshCw size={14} />
+            </button>
+          </div>
           <div className="popup-list">
             {visible.map((repo) => {
               const status = statuses[repo.path]?.status;
               return (
-                <div key={repo.path} className="popup-item" title={repo.path}>
+                <button
+                  key={repo.path}
+                  className="popup-item"
+                  title={repo.path}
+                  onClick={(e) => setOpen({ kind: "branches", repo: repo.path, at: { x: e.currentTarget.getBoundingClientRect().left, y: open.at.y } })}
+                >
                   <GitBranch size={14} className="secondary" />
                   {repoName(repo, info.home)}
                   <span className="hint">{status ? (status.branch ?? "detached HEAD") : ""}</span>
-                </div>
+                  <ChevronRight size={14} className="secondary" />
+                </button>
               );
             })}
           </div>
         </Popup>
       )}
+      {open?.kind === "branches" && <BranchesPopup session={session} repo={open.repo} at={open.at} onClose={close} />}
       {open?.kind === "manage" && <RepoManager session={session} onClose={close} />}
+      {open?.kind === "settings" && settings && <SettingsDialog settings={settings} onClose={close} />}
     </header>
   );
 }

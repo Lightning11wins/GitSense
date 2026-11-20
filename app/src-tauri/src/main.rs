@@ -48,6 +48,22 @@ fn list_machines() -> Vec<machines::Machine> {
 }
 
 #[tauri::command]
+fn settings(state: tauri::State<'_, AppState>) -> settings::Settings {
+    state.settings.get()
+}
+
+/// Saves the auto-fetch interval and sends the new settings to every window.
+#[tauri::command]
+fn set_auto_fetch_minutes(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    minutes: u32,
+) -> Result<(), String> {
+    state.settings.update(|s| s.auto_fetch_minutes = minutes);
+    app.emit("settings", state.settings.get()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn last_machine(state: tauri::State<'_, AppState>) -> Option<String> {
     state.settings.get().last_machine
 }
@@ -148,7 +164,15 @@ fn main() {
                 tauri::async_runtime::block_on(state.connections.lock()).remove(&label);
             }
         })
-        .invoke_handler(tauri::generate_handler![list_machines, last_machine, connect, request, new_window])
+        .invoke_handler(tauri::generate_handler![
+            list_machines,
+            settings,
+            set_auto_fetch_minutes,
+            last_machine,
+            connect,
+            request,
+            new_window
+        ])
         .run(tauri::generate_context!())
         .expect("Failed to run GitSense");
 }

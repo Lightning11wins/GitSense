@@ -1,10 +1,11 @@
 import { X } from "lucide-react";
 import { useSession, type Session } from "./session";
 import { DiffView } from "./DiffView";
+import { PushView } from "./PushView";
 import { baseName } from "./repos";
 import "./CenterTabs.css";
 
-/** The center editor area: a tab per open diff. */
+/** The center editor area: tabs for diffs and pushes. */
 export function CenterTabs({ session }: { session: Session }) {
   const tabs = useSession(session, (s) => s.tabs);
   const active = useSession(session, (s) => s.activeTab);
@@ -16,10 +17,10 @@ export function CenterTabs({ session }: { session: Session }) {
           <div
             key={tab.id}
             className={`center-tab ${tab.id === active ? "active" : ""}`}
-            title={`${tab.repo}/${tab.path}`}
+            title={tab.kind === "diff" ? `${tab.repo}/${tab.right.path}` : "Push Commits"}
             onMouseDown={(e) => (e.button === 1 ? session.closeTab(tab.id) : session.activateTab(tab.id))}
           >
-            <span>{baseName(tab.path)}</span>
+            <span>{tab.kind === "diff" ? baseName(tab.right.path) : "Push"}</span>
             <button
               className="center-tab-close"
               title="Close"
@@ -33,7 +34,7 @@ export function CenterTabs({ session }: { session: Session }) {
       </div>
       {tabs.map((tab) => (
         <div key={tab.id} className="center-content" hidden={tab.id !== active}>
-          <DiffView session={session} tab={tab} />
+          {tab.kind === "diff" ? <DiffView session={session} tab={tab} /> : <PushView session={session} tab={tab} />}
         </div>
       ))}
     </>

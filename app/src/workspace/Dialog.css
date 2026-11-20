@@ -82,3 +82,28 @@
 .grow {
   flex: 1;
 }
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+}
+
+.dialog-body label:has(> input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minutes {
+  width: 48px;
+  height: 26px;
+  padding: 0 6px;
+  text-align: right;
+}

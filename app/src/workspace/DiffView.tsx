@@ -12,15 +12,22 @@ import { useSession, type Session } from "./session";
 import { editorTheme, mergeTheme } from "./editorTheme";
 import "./DiffView.css";
 
-export type DiffTab = { id: string; repo: string; path: string; origPath: string | null };
+/** A diff of two versions of a file. The right side is the editable working tree when it has no `rev`. */
+export type DiffTab = {
+  kind: "diff";
+  id: string;
+  repo: string;
+  left: { rev: string; path: string };
+  right: { rev?: string; path: string };
+};
 
-type Loaded = { head: FileContent; work: FileContent };
+type Loaded = { left: FileContent; right: FileContent };
 
 /** Marks transactions that load text from the machine, as opposed to user edits. */
 const fromDisk = Annotation.define<boolean>();
 const SAVE_DELAY_MS = 300;
 
-/** Side-by-side diff of HEAD against the working tree, whose side is editable and saved back. */
+/** Side-by-side diff of two file versions. A working-tree right side is editable and saved back. */
 export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
   const status = useSession(session, (s) => s.statuses[tab.repo]?.status);
   const [loaded, setLoaded] = useState<Loaded>();
@@ -31,32 +38,41 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
   const merge = useRef<MergeView>(null);
   const saver = useRef<Saver>(null);
 
+  const { left, right } = tab;
+  const working = right.rev === undefined;
+
   // Reload both sides whenever the repo's status changes, which covers edits, commits, and rollbacks.
   useEffect(() => {
     let stale = false;
-    const read = (version: Parameters<typeof call<"file.read">>[1]["version"], path: string) =>
-      call("file.read", { repo: tab.repo, path, version });
-    Promise.all([read({ kind: "revision", rev: "HEAD" }, tab.origPath ?? tab.path), read({ kind: "working_tree" }, tab.path)])
-      .then(([head, work]) => {
+    const read = (path: string, rev?: string) =>
+      call("file.read", {
+        repo: tab.repo,
+        path,
+        version: rev === undefined ? { kind: "working_tree" } : { kind: "revision", rev },
+      });
+    Promise.all([read(left.path, left.rev), read(right.path, right.rev)])
+      .then(([leftText, rightText]) => {
         if (stale) return;
         setError(undefined);
-        setLoaded((old) => (old && same(old.head, head) && same(old.work, work) ? old : { head, work }));
+        setLoaded((old) =>
+          old && same(old.left, leftText) && same(old.right, rightText) ? old : { left: leftText, right: rightText },
+        );
       })
       .catch((e) => !stale && setError(String(e)));
     return () => {
       stale = true;
     };
-  }, [tab.repo, tab.path, tab.origPath, status]);
+  }, [tab.repo, left.path, left.rev, right.path, right.rev, status]);
 
-  const editable = !!loaded?.work.exists && !loaded.work.binary;
-  const showText = !!loaded && !loaded.head.binary && !loaded.work.binary;
+  const editable = working && !!loaded?.right.exists && !loaded.right.binary;
+  const showText = !!loaded && !loaded.left.binary && !loaded.right.binary;
 
   // Build the editors once per tab and editability; later loads update their text in place.
   useEffect(() => {
     if (!showText || !host.current || !loaded) return;
     const language = new Compartment();
-    const headText = loaded.head.text ?? "";
-    const workText = loaded.work.text ?? "";
+    const headText = loaded.left.text ?? "";
+    const workText = loaded.right.text ?? "";
     const base = (text: string): Extension[] => [
       EditorState.lineSeparator.of(text.includes("\r\n") ? "\r\n" : "\n"),
       lineNumbers(),
@@ -69,7 +85,7 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
         { key: "Shift-F7", run: goToPreviousChunk },
       ]),
     ];
-    const saverNow = new Saver(tab.repo, tab.path, workText, setSaveError);
+    const saverNow = new Saver(tab.repo, right.path, workText, setSaveError);
     saver.current = saverNow;
     const view = new MergeView({
       a: { doc: headText, extensions: [...base(headText), EditorState.readOnly.of(true), EditorView.editable.of(false)] },
@@ -101,7 +117,7 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       const pos = Math.min(first.fromB, view.b.state.doc.length);
       view.b.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: "center" }) });
     }
-    const desc = LanguageDescription.matchFilename(languages, tab.path);
+    const desc = LanguageDescription.matchFilename(languages, right.path);
     desc?.load().then((support) => {
       for (const editor of [view.a, view.b]) editor.dispatch({ effects: language.reconfigure(support) });
     });
@@ -111,15 +127,15 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       merge.current = null;
     };
     // Text changes are applied by the effect below, without rebuilding the editors.
-  }, [showText, editable, tab.repo, tab.path]);
+  }, [showText, editable, tab.repo, right.path]);
 
   useEffect(() => {
     const view = merge.current;
     if (!view || !loaded) return;
-    replaceText(view.a, loaded.head.text ?? "");
+    replaceText(view.a, loaded.left.text ?? "");
     // Keep the user's unsaved edits; disk changes apply once the editor matches what was last saved.
     if (saver.current?.isClean(view.b.state.sliceDoc())) {
-      replaceText(view.b, loaded.work.text ?? "");
+      replaceText(view.b, loaded.right.text ?? "");
       saver.current.markLoaded(view.b.state.sliceDoc());
     }
     setChunkCount(view.chunks.length);
@@ -154,14 +170,22 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       </div>
       {showText && (
         <div className="diff-sides secondary">
-          <span>{loaded.head.exists ? `HEAD: ${tab.origPath ?? tab.path}` : "HEAD: no file"}</span>
-          <span>{loaded.work.exists ? "Your version" : "Your version: deleted"}</span>
+          <span>{sideLabel(left.rev, loaded.left.exists ? left.path : "no file")}</span>
+          <span>
+            {working ? (loaded.right.exists ? "Your version" : "Your version: deleted") : sideLabel(right.rev!, loaded.right.exists ? right.path : "no file")}
+          </span>
         </div>
       )}
       {body}
       <div className="diff-host" ref={host} hidden={!showText} />
     </div>
   );
+}
+
+/** Labels a side by its revision, shortening hashes. */
+function sideLabel(rev: string, detail: string) {
+  const short = rev.replace(/^([0-9a-f]{8})[0-9a-f]{32,}/, "$1");
+  return `${short}: ${detail}`;
 }
 
 function revertButton() {

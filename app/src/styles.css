@@ -234,3 +234,7 @@ textarea:focus {
 .status-conflicted {
   color: var(--status-conflicted);
 }
+
+.warning-text {
+  color: var(--warning);
+}

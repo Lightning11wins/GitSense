@@ -1,7 +1,5 @@
-import type { Repo } from "../protocol.gen";
-
 /** The repo's path relative to home, or its absolute path when outside home. */
-export function repoName(repo: Repo, home: string): string {
+export function repoName(repo: { path: string }, home: string): string {
   if (repo.path === home) return "~";
   const prefix = home.endsWith("/") ? home : `${home}/`;
   return repo.path.startsWith(prefix) ? repo.path.slice(prefix.length) : repo.path;

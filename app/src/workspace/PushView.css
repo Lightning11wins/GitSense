@@ -1,0 +1,78 @@
+.push-view {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+
+.push-title {
+  font-weight: 600;
+  padding-left: 4px;
+}
+
+.push-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-top: 1px solid var(--border);
+}
+
+.push-commits {
+  flex: 1;
+  min-width: 0;
+}
+
+.push-files {
+  width: 320px;
+  border-left: 1px solid var(--border);
+}
+
+.push-target {
+  gap: 6px;
+  padding-left: 8px;
+  height: 30px;
+}
+
+.push-target select,
+.push-branch {
+  height: 22px;
+  padding: 0 6px;
+}
+
+.push-branch {
+  width: 180px;
+}
+
+.push-new {
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: var(--bg-hover);
+  color: var(--status-added);
+}
+
+.push-commit {
+  gap: 12px;
+  padding-left: 52px;
+}
+
+.push-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.push-error {
+  padding: 2px 8px 4px 52px;
+  white-space: pre-wrap;
+}
+
+.push-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}

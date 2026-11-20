@@ -8,13 +8,18 @@ type Props = {
   onConfirm: () => Promise<void>;
   onClose: () => void;
   children: ReactNode;
+  /** Focuses the confirm button on open; turn off when a child field takes focus. */
+  focusConfirm?: boolean;
+  /** Why confirming is not possible yet. Disables the confirm button. */
+  blocker?: string;
 };
 
 /** A modal asking to confirm an action, with room for options. */
-export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, children }: Props) {
+export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, children, focusConfirm = true, blocker }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   async function confirm() {
+    if (busy || blocker) return;
     setBusy(true);
     setError(undefined);
     try {
@@ -31,7 +36,14 @@ export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, childre
       onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}
       onKeyDown={(e) => e.key === "Escape" && !busy && onClose()}
     >
-      <div className="dialog" style={{ width: 520 }}>
+      <form
+        className="dialog"
+        style={{ width: 520 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          confirm();
+        }}
+      >
         <div className="dialog-title">{title}</div>
         <div className="dialog-body">
           {children}
@@ -39,14 +51,14 @@ export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, childre
         </div>
         <div className="dialog-buttons">
           <span className="grow" />
-          <button className="button" disabled={busy} onClick={onClose}>
+          <button type="button" className="button" disabled={busy} onClick={onClose}>
             Cancel
           </button>
-          <button className="button primary" disabled={busy} autoFocus onClick={confirm}>
+          <button type="submit" className="button primary" disabled={busy || !!blocker} title={blocker} autoFocus={focusConfirm}>
             {confirmLabel}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

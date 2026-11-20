@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GitBranch, GitCommitHorizontal, SquareTerminal } from "lucide-react";
 import { Splitter } from "./Splitter";
 import { useSession, type Session } from "./session";
@@ -20,10 +20,29 @@ export function Workspace({ session }: { session: Session }) {
   const disconnected = useSession(session, (s) => s.disconnected);
 
   const toggleBottom = (tab: BottomTab) => setBottomTab((current) => (current === tab ? null : tab));
+  const focusCommit = () => {
+    setLeftOpen(true);
+    session.requestCommitFocus();
+  };
+
+  // Global shortcuts from IntelliJ's keymap.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (!e.ctrlKey || e.altKey) return;
+      if (key === "k" && !e.shiftKey) focusCommit();
+      else if (key === "k" && e.shiftKey) session.openPush();
+      else if (key === "t" && !e.shiftKey) session.updateProject();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [session]);
 
   return (
     <div className="workspace">
-      <TopBar session={session} />
+      <TopBar session={session} onCommit={focusCommit} />
       <div className="workspace-body">
         <nav className="stripe">
           <button
