@@ -4,6 +4,7 @@ mod machines;
 mod settings;
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -22,6 +23,8 @@ struct AppState {
     connections: Mutex<HashMap<String, Arc<Connection>>>,
     next_window: AtomicUsize,
     settings: settings::Store,
+    /// Webview storage, kept with the config so separate config dirs do not share it.
+    webview_dir: PathBuf,
 }
 
 #[derive(Serialize, Clone)]
@@ -116,6 +119,7 @@ fn open_window(app: &tauri::AppHandle, state: &AppState, auto_connect: bool) -> 
         .title("GitSense")
         .inner_size(1400.0, 900.0)
         .min_inner_size(800.0, 500.0)
+        .data_directory(state.webview_dir.clone())
         .build()?;
     Ok(())
 }
@@ -123,15 +127,16 @@ fn open_window(app: &tauri::AppHandle, state: &AppState, auto_connect: bool) -> 
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let config_dir = match std::env::var_os("GITSENSE_CONFIG_DIR") {
-                Some(dir) => dir.into(),
-                None => app.path().app_config_dir()?,
+            let (config_dir, webview_dir) = match std::env::var_os("GITSENSE_CONFIG_DIR") {
+                Some(dir) => (PathBuf::from(&dir), PathBuf::from(dir).join("webview")),
+                None => (app.path().app_config_dir()?, app.path().app_local_data_dir()?),
             };
             app.manage(AppState {
                 helper: HelperBinary::new(HELPER),
                 connections: Mutex::new(HashMap::new()),
                 next_window: AtomicUsize::new(1),
                 settings: settings::Store::load(config_dir.join("settings.json")),
+                webview_dir,
             });
             open_window(app.handle(), &app.state::<AppState>(), true)?;
             Ok(())
