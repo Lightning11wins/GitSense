@@ -6,11 +6,19 @@ Changes to this design are made by agreement with the project owner, then record
 
 ## Goals
 
-- Connect to a machine in seconds, not minutes.
-- Small footprint: about 5 MB on the server, tens of MB on the client.
-- Show all repos on a machine in one window (typically 2 to 25 repos).
-- Feel familiar to an IntelliJ user: New UI layout, dark theme, IntelliJ's default Linux keymap.
-- Linux only (client and servers), x86_64 first.
+These two goals drive every decision. When they conflict, bring the trade-off and its costs to the owner to decide.
+
+1. **Features**: good Git management, with IntelliJ's Git features as the baseline.
+   - Feel familiar to an IntelliJ user: New UI layout, dark theme, IntelliJ's default Linux keymap.
+   - Show all repos on a machine in one window (typically 2 to 25 repos).
+2. **Lightweight**: faster, with less RAM and disk, on both the client and the server, than running a large editor like IntelliJ.
+   - Connect to a machine in seconds, not minutes.
+   - About 5 MB on the server, tens of MB on the client.
+
+## Platforms
+
+- Linux only, x86_64 first, for both client and servers.
+- The app is used on Linux Mint desktops. Development and tests run on a headless Rocky Linux machine, so everything must be testable without a desktop session.
 
 ## Architecture
 
@@ -155,7 +163,7 @@ Keyboard shortcuts follow IntelliJ's default Linux keymap for every implemented 
 
 ## Not in v1
 
-Interactive rebase, tags, remote management, submodules, pull requests, file/folder history, Compare with Branch for a path, Local History, review aids (viewed marks, notes), several machines per window, macOS and Windows clients, non-x86_64 servers.
+Interactive rebase, tags, remote management, submodules, pull requests, file/folder history, Compare with Branch for a path, Local History, review aids (viewed marks, notes), several machines per window.
 
 ## Development
 
@@ -185,8 +193,3 @@ Several agents work in separate worktrees on one machine at once. Building, runn
 5. Merge, rebase, cherry-pick, conflicts dialog, merge tool with magic wand; branch comparison.
 6. Changelists and partial commits.
 7. Shelf, patches, blame, Git Console.
-
-## Open Questions
-
-- Diff engine: one algorithm must decide chunks for both display and partial commits; confirm CodeMirror's merge view can render externally computed chunks, or compute diffs in the UI.
-- Chunk-level changelist assignments must survive later edits to the file; the matching rule (by content near the chunk) needs a design when building step 6.
