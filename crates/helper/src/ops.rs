@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use gitsense_protocol::{Empty, Operation, RepoParams};
+use gitsense_protocol::{Empty, Operation, RepoParams, RevsParams};
 
 use crate::git::{Git, git};
 use crate::repos::GitDirs;
@@ -79,5 +79,23 @@ pub fn skip_operation(ctx: &Ctx, params: RepoParams) -> Result<Empty> {
     }
     let what = format!("skip a commit of the {} in '{}'", operation_name(op), params.repo);
     run_stoppable(ctx, repo, git(ctx, repo).args([operation_name(op), "--skip"]), &what)?;
+    Ok(Empty {})
+}
+
+pub fn cherry_pick(ctx: &Ctx, params: RevsParams) -> Result<Empty> {
+    apply_commits(ctx, params, "cherry-pick", &["--end-of-options"])
+}
+
+pub fn revert(ctx: &Ctx, params: RevsParams) -> Result<Empty> {
+    apply_commits(ctx, params, "revert", &["--no-edit", "--end-of-options"])
+}
+
+fn apply_commits(ctx: &Ctx, params: RevsParams, command: &str, options: &[&str]) -> Result<Empty> {
+    if params.revs.is_empty() {
+        return Err(Error::new(format!("Failed to {command} in '{}': no revisions were given.", params.repo)));
+    }
+    let repo = Path::new(&params.repo);
+    let cmd = git(ctx, repo).arg(command).args(options).args(&params.revs);
+    run_stoppable(ctx, repo, cmd, &format!("{command} '{}' in '{}'", params.revs.join(" "), params.repo))?;
     Ok(Empty {})
 }

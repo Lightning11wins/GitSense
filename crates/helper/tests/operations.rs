@@ -3,7 +3,9 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use common::Machine;
-use gitsense_protocol::{Operation, OperationAbort, OperationContinue, OperationSkip, RepoParams, Status};
+use gitsense_protocol::{
+    CherryPick, Operation, OperationAbort, OperationContinue, OperationSkip, RepoParams, Revert, RevsParams, Status,
+};
 
 fn s(path: &Path) -> String {
     path.display().to_string()
@@ -135,4 +137,74 @@ async fn continues_skips_and_aborts_a_rebase() {
     session.conn.call::<OperationAbort>(repo_params(&repo)).await.unwrap();
     assert_eq!(operation(&session, &repo).await, None);
     assert_eq!(machine.git(&repo, &["rev-parse", "HEAD"]).trim(), topic);
+}
+
+/// Commits each file on a new branch `source`, returns the hashes oldest first, and returns to `main`.
+fn topic_commits(machine: &Machine, repo: &Path, files: &[&str]) -> Vec<String> {
+    machine.git(repo, &["switch", "-q", "-c", "source"]);
+    let hashes = files.iter().map(|f| commit_file(machine, repo, f, &format!("{f}\n"))).collect();
+    machine.git(repo, &["switch", "-q", "main"]);
+    hashes
+}
+
+#[tokio::test]
+async fn cherry_picks_in_the_given_order() {
+    let machine = Machine::new();
+    let repo = machine.repo("app");
+    let hashes = topic_commits(&machine, &repo, &["one.txt", "two.txt", "three.txt"]);
+    let session = machine.connect_local().await;
+
+    let revs = vec![hashes[2].clone(), hashes[0].clone()];
+    session.conn.call::<CherryPick>(RevsParams { repo: s(&repo), revs }).await.unwrap();
+    assert_eq!(machine.git(&repo, &["log", "--format=%s", "-2"]), "Edit one.txt.\nEdit three.txt.\n");
+
+    let err = session.conn.call::<CherryPick>(RevsParams { repo: s(&repo), revs: vec![] }).await.unwrap_err();
+    assert!(err.to_string().starts_with("Failed to cherry-pick") && err.to_string().contains(&s(&repo)), "{err}");
+    let revs = vec!["no-such-rev".to_string()];
+    let err = session.conn.call::<CherryPick>(RevsParams { repo: s(&repo), revs }).await.unwrap_err();
+    assert!(err.to_string().contains("'no-such-rev'"), "{err}");
+}
+
+#[tokio::test]
+async fn cherry_pick_conflict_stays_in_progress_until_continued() {
+    let machine = Machine::new();
+    let repo = diverged(&machine);
+    let topic = machine.git(&repo, &["rev-parse", "topic"]).trim().to_string();
+    machine.git(&repo, &["switch", "-q", "-c", "side", "topic~1"]);
+    let later = commit_file(&machine, &repo, "later.txt", "later\n");
+    machine.git(&repo, &["switch", "-q", "main"]);
+    let session = machine.connect_local().await;
+
+    let revs = vec![topic, later];
+    let err = session.conn.call::<CherryPick>(RevsParams { repo: s(&repo), revs }).await.unwrap_err();
+    assert!(err.to_string().contains("1 file(s) have conflicts"), "{err}");
+    assert_eq!(operation(&session, &repo).await, Some(Operation::CherryPick));
+
+    resolve(&machine, &repo, "both\n");
+    session.conn.call::<OperationContinue>(repo_params(&repo)).await.unwrap();
+    assert_eq!(operation(&session, &repo).await, None);
+    assert_eq!(machine.git(&repo, &["log", "--format=%s", "-2"]), "Edit later.txt.\nEdit a.txt.\n");
+}
+
+#[tokio::test]
+async fn reverts_commits_with_default_messages_and_stops_on_conflict() {
+    let machine = Machine::new();
+    let repo = machine.repo("app");
+    let first = commit_file(&machine, &repo, "a.txt", "one\n");
+    let second = commit_file(&machine, &repo, "b.txt", "two\n");
+    let session = machine.connect_local().await;
+
+    let revs = vec![second.clone(), first.clone()];
+    session.conn.call::<Revert>(RevsParams { repo: s(&repo), revs }).await.unwrap();
+    assert_eq!(machine.git(&repo, &["log", "--format=%s", "-2"]), "Revert \"Edit a.txt.\"\nRevert \"Edit b.txt.\"\n");
+    assert!(!repo.join("a.txt").exists() && !repo.join("b.txt").exists());
+
+    // Reverting the first edit again would now conflict with the later edit of a.txt.
+    commit_file(&machine, &repo, "a.txt", "three\n");
+    let revs = vec![first];
+    let err = session.conn.call::<Revert>(RevsParams { repo: s(&repo), revs }).await.unwrap_err();
+    assert!(err.to_string().starts_with("Failed to revert"), "{err}");
+    assert_eq!(operation(&session, &repo).await, Some(Operation::Revert));
+    session.conn.call::<OperationSkip>(repo_params(&repo)).await.unwrap();
+    assert_eq!(operation(&session, &repo).await, None);
 }

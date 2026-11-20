@@ -307,6 +307,12 @@ changes: Array<FileChange>, };
 
 export type RevParams = { repo: string, rev: string, };
 
+export type RevsParams = { repo: string, 
+/**
+ * Revisions to apply, in order. Must not be empty.
+ */
+revs: Array<string>, };
+
 export type RollbackParams = { repo: string, 
 /**
  * Tracked files, relative to the repo root. Renames need both paths.
@@ -385,4 +391,6 @@ export type Methods = {
   "operation.continue": { params: RepoParams; result: Empty };
   "operation.abort": { params: RepoParams; result: Empty };
   "operation.skip": { params: RepoParams; result: Empty };
+  "cherry_pick": { params: RevsParams; result: Empty };
+  "revert": { params: RevsParams; result: Empty };
 };

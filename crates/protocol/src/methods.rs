@@ -101,6 +101,12 @@ methods! {
     OperationAbort = "operation.abort" (RepoParams) -> Empty;
     /// Skips the current commit of a rebase, cherry-pick, or revert. Fails for a merge or when nothing is in progress.
     OperationSkip = "operation.skip" (RepoParams) -> Empty;
+    /// Cherry-picks commits onto the current branch in the given order. A conflict leaves the cherry-pick in
+    /// progress and fails with a message naming the number of conflicted files.
+    CherryPick = "cherry_pick" (RevsParams) -> Empty;
+    /// Reverts commits on the current branch in the given order, with git's default messages. A conflict leaves
+    /// the revert in progress and fails with a message naming the number of conflicted files.
+    Revert = "revert" (RevsParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -540,4 +546,13 @@ pub struct ChangelistPathsParams {
     pub name: String,
     /// Paths relative to the repo root.
     pub paths: Vec<String>,
+}
+
+// Operations, conflicts, comparison, commit actions.
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RevsParams {
+    pub repo: String,
+    /// Revisions to apply, in order. Must not be empty.
+    pub revs: Vec<String>,
 }
