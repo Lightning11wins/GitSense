@@ -50,6 +50,32 @@ methods! {
     IgnoreTargets = "ignore.targets" (PathsParams) -> Vec<IgnoreFile>;
     /// Adds the given paths to an ignore file, creating it if needed.
     IgnoreAdd = "ignore.add" (IgnoreAddParams) -> Empty;
+    /// Lists files a commit changed, compared with its first parent.
+    CommitFiles = "commit.files" (RevParams) -> Vec<FileChange>;
+    /// Lists local and remote-tracking branches.
+    BranchesList = "branches.list" (RepoParams) -> Branches;
+    Checkout = "checkout" (CheckoutParams) -> Empty;
+    BranchCreate = "branch.create" (BranchCreateParams) -> Empty;
+    BranchRename = "branch.rename" (BranchRenameParams) -> Empty;
+    /// Deletes a local branch, or a branch on a remote.
+    BranchDelete = "branch.delete" (BranchDeleteParams) -> Empty;
+    /// Fast-forwards a branch that is not checked out to its upstream.
+    BranchUpdate = "branch.update" (BranchParams) -> Empty;
+    /// Merges a revision into the current branch.
+    Merge = "merge" (RevParams) -> Empty;
+    /// Rebases `branch`, or the current branch, onto `onto`.
+    Rebase = "rebase" (RebaseParams) -> Empty;
+    RemotesList = "remotes.list" (RepoParams) -> Vec<String>;
+    /// Fetches all remotes, pruning deleted branches.
+    Fetch = "fetch" (RepoParams) -> Empty;
+    /// Updates the current branch with `git pull --autostash`, merging or rebasing as configured.
+    Pull = "pull" (RepoParams) -> Empty;
+    /// Lists commits a push would send, newest first.
+    PushOutgoing = "push.outgoing" (PushTargetParams) -> Vec<CommitInfo>;
+    Push = "push" (PushParams) -> Empty;
+    WorktreesList = "worktrees.list" (RepoParams) -> Vec<Worktree>;
+    /// Removes a worktree. Without `force`, refuses when it has uncommitted changes or unmerged commits.
+    WorktreeRemove = "worktree.remove" (WorktreeRemoveParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -218,4 +244,151 @@ pub struct IgnoreAddParams {
     pub file: IgnoreFile,
     /// Paths relative to the repo root. Each must be inside the ignore file's dir.
     pub paths: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct BranchParams {
+    pub repo: String,
+    pub branch: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct Branches {
+    /// Sorted by name.
+    pub local: Vec<LocalBranch>,
+    /// Remote-tracking branches, sorted by name.
+    pub remote: Vec<RemoteBranch>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct LocalBranch {
+    pub name: String,
+    /// Upstream as `remote/branch`.
+    pub upstream: Option<String>,
+    /// True when the upstream is configured but no longer exists.
+    pub upstream_gone: bool,
+    pub ahead: u32,
+    pub behind: u32,
+    /// Checked out in this working tree.
+    pub current: bool,
+    /// Path of the working tree where it is checked out, if any.
+    pub worktree: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RemoteBranch {
+    pub remote: String,
+    /// Branch name on the remote, without the remote prefix.
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CheckoutParams {
+    pub repo: String,
+    pub target: CheckoutTarget,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CheckoutTarget {
+    Branch {
+        name: String,
+    },
+    /// Creates a local branch tracking the remote branch.
+    Remote {
+        remote: String,
+        name: String,
+    },
+    /// Detaches HEAD at a commit, tag, or other revision.
+    Revision {
+        rev: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct BranchCreateParams {
+    pub repo: String,
+    pub name: String,
+    /// Revision the branch starts at.
+    pub start: String,
+    pub checkout: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct BranchRenameParams {
+    pub repo: String,
+    pub from: String,
+    pub to: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct BranchDeleteParams {
+    pub repo: String,
+    pub name: String,
+    /// Deletes the branch on this remote instead of the local branch.
+    pub remote: Option<String>,
+    /// Deletes a local branch even when it is not merged.
+    pub force: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RebaseParams {
+    pub repo: String,
+    pub onto: String,
+    pub branch: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct PushTargetParams {
+    pub repo: String,
+    /// Local branch to push.
+    pub branch: String,
+    pub remote: String,
+    /// Branch name on the remote.
+    pub remote_branch: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct PushParams {
+    pub repo: String,
+    pub branch: String,
+    pub remote: String,
+    pub remote_branch: String,
+    pub set_upstream: bool,
+    pub force_with_lease: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CommitInfo {
+    pub hash: String,
+    pub parents: Vec<String>,
+    pub author_name: String,
+    pub author_email: String,
+    /// Author date in seconds since the Unix epoch.
+    pub author_time: i64,
+    pub subject: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct Worktree {
+    pub path: String,
+    /// None before the first commit.
+    pub head: Option<String>,
+    /// None when HEAD is detached.
+    pub branch: Option<String>,
+    pub is_main: bool,
+    pub locked: bool,
+    /// The worktree's directory is missing.
+    pub prunable: bool,
+    /// Commits at its HEAD that no other branch or remote branch contains.
+    pub unmerged: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct WorktreeRemoveParams {
+    pub repo: String,
+    pub path: String,
+    pub force: bool,
+    /// Also deletes the worktree's branch.
+    pub delete_branch: bool,
 }

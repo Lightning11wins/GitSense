@@ -1,15 +1,19 @@
 //! `gitsense-helper`: runs on the machine being managed and serves the
 //! GitSense protocol on stdin/stdout.
 
+mod branches;
 mod changes;
 mod commit;
 mod error;
 mod files;
 mod git;
+mod log;
 mod paths;
+mod remote;
 mod repos;
 mod status;
 mod watch;
+mod worktrees;
 
 use std::io::{BufRead, Write};
 use std::sync::{Arc, Mutex};
@@ -119,6 +123,22 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::FilesDelete::NAME => call::<p::FilesDelete>(ctx, params, changes::delete_files),
         p::IgnoreTargets::NAME => call::<p::IgnoreTargets>(ctx, params, changes::ignore_targets),
         p::IgnoreAdd::NAME => call::<p::IgnoreAdd>(ctx, params, changes::ignore_add),
+        p::CommitFiles::NAME => call::<p::CommitFiles>(ctx, params, commit::files),
+        p::BranchesList::NAME => call::<p::BranchesList>(ctx, params, branches::list),
+        p::Checkout::NAME => call::<p::Checkout>(ctx, params, branches::checkout),
+        p::BranchCreate::NAME => call::<p::BranchCreate>(ctx, params, branches::create),
+        p::BranchRename::NAME => call::<p::BranchRename>(ctx, params, branches::rename),
+        p::BranchDelete::NAME => call::<p::BranchDelete>(ctx, params, branches::delete),
+        p::BranchUpdate::NAME => call::<p::BranchUpdate>(ctx, params, branches::update),
+        p::Merge::NAME => call::<p::Merge>(ctx, params, branches::merge),
+        p::Rebase::NAME => call::<p::Rebase>(ctx, params, branches::rebase),
+        p::RemotesList::NAME => call::<p::RemotesList>(ctx, params, branches::list_remotes),
+        p::Fetch::NAME => call::<p::Fetch>(ctx, params, remote::fetch),
+        p::Pull::NAME => call::<p::Pull>(ctx, params, remote::pull),
+        p::PushOutgoing::NAME => call::<p::PushOutgoing>(ctx, params, remote::outgoing),
+        p::Push::NAME => call::<p::Push>(ctx, params, remote::push),
+        p::WorktreesList::NAME => call::<p::WorktreesList>(ctx, params, worktrees::list),
+        p::WorktreeRemove::NAME => call::<p::WorktreeRemove>(ctx, params, worktrees::remove),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

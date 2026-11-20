@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use gitsense_protocol::{CommitParams, CommitResult, RevParams};
+use gitsense_protocol::{ChangeKind, CommitParams, CommitResult, FileChange, RevParams};
 
 use crate::files::repo_path;
 use crate::{Ctx, Error, Result, git::git};
@@ -38,6 +38,43 @@ pub fn message(ctx: &Ctx, params: RevParams) -> Result<String> {
         .args(["log", "-1", "--format=%B", "--end-of-options", &params.rev, "--"])
         .run()?;
     Ok(out.stdout_str()?.trim_end().to_string())
+}
+
+pub fn files(ctx: &Ctx, params: RevParams) -> Result<Vec<FileChange>> {
+    let repo = Path::new(&params.repo);
+    let out = git(ctx, repo)
+        .args(["rev-parse", "--verify", "--end-of-options", &format!("{}^{{commit}}", params.rev)])
+        .run()?;
+    let hash = out.stdout_str()?.trim().to_string();
+    let diff = git(ctx, repo).args(["diff-tree", "-r", "-z", "--name-status", "-M", "--no-commit-id"]);
+    // Compare with the first parent, so merges list what they brought in.
+    let has_parent =
+        git(ctx, repo).args(["rev-parse", "--verify", "-q", &format!("{hash}^1")]).run_unchecked()?.success();
+    let out =
+        if has_parent { diff.args([format!("{hash}^1"), hash]) } else { diff.args(["--root".into(), hash]) }.run()?;
+    parse_name_status(out.stdout_str()?)
+}
+
+/// Parses `git diff --name-status -z` output.
+fn parse_name_status(text: &str) -> Result<Vec<FileChange>> {
+    let mut fields = text.split('\0').filter(|f| !f.is_empty());
+    let mut changes = Vec::new();
+    while let Some(status) = fields.next() {
+        let bad = || Error::new(format!("Failed to parse diff status {status:?}."));
+        let mut path = || fields.next().map(String::from).ok_or_else(bad);
+        let change = match status.chars().next() {
+            Some('R') => {
+                let orig = path()?;
+                FileChange { path: path()?, orig_path: Some(orig), kind: ChangeKind::Renamed }
+            }
+            Some('A') | Some('C') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Added },
+            Some('D') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Deleted },
+            Some('M') | Some('T') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Modified },
+            _ => return Err(bad()),
+        };
+        changes.push(change);
+    }
+    Ok(changes)
 }
 
 /// The given paths that are in the index.
