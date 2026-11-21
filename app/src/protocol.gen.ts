@@ -81,6 +81,16 @@ export type CheckoutParams = { repo: string, target: CheckoutTarget, };
 
 export type CheckoutTarget = { "kind": "branch", name: string, } | { "kind": "remote", remote: string, name: string, } | { "kind": "revision", rev: string, };
 
+export type CommitContent = { 
+/**
+ * Path relative to the repo root.
+ */
+path: string, 
+/**
+ * The exact file content to commit, or None to delete the file in the commit.
+ */
+text: string | null, };
+
 export type CommitInfo = { hash: string, parents: Array<string>, author_name: string, author_email: string, 
 /**
  * Author date in seconds since the Unix epoch.
@@ -96,7 +106,12 @@ paths: Array<string>, message: string,
 /**
  * Replaces HEAD instead of adding a commit on top of it.
  */
-amend: boolean, };
+amend: boolean, 
+/**
+ * Content to commit for some files in place of their working-tree content. These paths must not
+ * also be in `paths`. The working tree is not changed.
+ */
+contents?: Array<CommitContent>, };
 
 export type CommitResult = { 
 /**

@@ -23,6 +23,7 @@ fn commit_params(repo: &Path, paths: &[&str], message: &str) -> CommitParams {
         paths: paths.iter().map(|p| p.to_string()).collect(),
         message: message.into(),
         amend: false,
+        contents: None,
     }
 }
 

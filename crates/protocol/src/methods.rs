@@ -35,7 +35,8 @@ methods! {
     FileRead = "file.read" (FileReadParams) -> FileContent;
     /// Writes a working-tree file.
     FileWrite = "file.write" (FileWriteParams) -> Empty;
-    /// Commits the working-tree content of whole files. Other changes, staged or not, stay as they are.
+    /// Commits the working-tree content of whole files, plus given content for other files. Other changes,
+    /// staged or not, and the working tree stay as they are.
     Commit = "commit" (CommitParams) -> CommitResult;
     /// Reads a commit's full message.
     CommitMessage = "commit.message" (RevParams) -> String;
@@ -227,6 +228,19 @@ pub struct CommitParams {
     pub message: String,
     /// Replaces HEAD instead of adding a commit on top of it.
     pub amend: bool,
+    /// Content to commit for some files in place of their working-tree content. These paths must not
+    /// also be in `paths`. The working tree is not changed.
+    #[serde(default)]
+    #[ts(optional)]
+    pub contents: Option<Vec<CommitContent>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CommitContent {
+    /// Path relative to the repo root.
+    pub path: String,
+    /// The exact file content to commit, or None to delete the file in the commit.
+    pub text: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
