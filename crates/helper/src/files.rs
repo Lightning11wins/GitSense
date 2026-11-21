@@ -36,7 +36,7 @@ pub fn write(_: &Ctx, params: FileWriteParams) -> Result<Empty> {
 }
 
 /// Reads a blob by object name, or None when it doesn't exist.
-fn read_object(ctx: &Ctx, repo: &str, object: &str) -> Result<Option<Vec<u8>>> {
+pub fn read_object(ctx: &Ctx, repo: &str, object: &str) -> Result<Option<Vec<u8>>> {
     if object.contains('\n') {
         return Err(Error::new(format!("Failed to read {object:?}: object names cannot contain newlines.")));
     }
@@ -62,7 +62,7 @@ fn read_object(ctx: &Ctx, repo: &str, object: &str) -> Result<Option<Vec<u8>>> {
     Ok(Some(body.to_vec()))
 }
 
-fn content(bytes: Option<Vec<u8>>) -> FileContent {
+pub fn content(bytes: Option<Vec<u8>>) -> FileContent {
     let Some(bytes) = bytes else {
         return FileContent { exists: false, text: None, binary: false };
     };

@@ -10,9 +10,11 @@ use serde_json::Value;
 use ts_rs::TS;
 
 mod methods;
+mod patches;
 pub mod ts;
 
 pub use methods::*;
+pub use patches::*;
 
 /// A protocol method: its wire name and its parameter and result types.
 pub trait Method {

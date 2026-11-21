@@ -127,7 +127,7 @@ fn append_lines(file: &PathBuf, lines: &[String]) -> Result<()> {
 }
 
 /// The given paths that are in HEAD; none before the first commit.
-fn head_paths(ctx: &Ctx, repo: &Path, paths: &[String]) -> Result<HashSet<String>> {
+pub fn head_paths(ctx: &Ctx, repo: &Path, paths: &[String]) -> Result<HashSet<String>> {
     if paths.is_empty() || !git(ctx, repo).args(["rev-parse", "--verify", "-q", "HEAD"]).run_unchecked()?.success() {
         return Ok(HashSet::new());
     }

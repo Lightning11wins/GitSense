@@ -188,6 +188,7 @@ pub fn parse_name_status(text: &str) -> Result<Vec<FileChange>> {
             Some('A') | Some('C') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Added },
             Some('D') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Deleted },
             Some('M') | Some('T') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Modified },
+            Some('U') => FileChange { path: path()?, orig_path: None, kind: ChangeKind::Conflicted },
             _ => return Err(bad()),
         };
         changes.push(change);

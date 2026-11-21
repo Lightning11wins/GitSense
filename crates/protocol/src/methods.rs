@@ -125,6 +125,31 @@ methods! {
     CompareCommits = "compare.commits" (CompareParams) -> Vec<CommitInfo>;
     /// Lists the files `head` changed since its merge base with `base`. Fails when they share no history.
     CompareFiles = "compare.files" (CompareParams) -> Vec<FileChange>;
+    // Shelf, patches, blame.
+    /// Lists a repo's shelf entries, newest first.
+    ShelfList = "shelf.list" (RepoParams) -> Vec<crate::ShelfEntry>;
+    /// Saves the changes of tracked paths against HEAD as a shelf entry, then reverts those paths to HEAD.
+    /// Other changes, staged or not, stay as they are.
+    ShelfCreate = "shelf.create" (crate::ShelfCreateParams) -> crate::ShelfEntry;
+    /// Reads a shelved file before and after its entry's changes, without touching the working tree.
+    ShelfFile = "shelf.file" (crate::ShelfFileParams) -> crate::FileSides;
+    /// Applies shelved files to the working tree, three-way when needed. Conflicts leave markers and
+    /// unmerged index entries and fail the request, which keeps the entry. Otherwise the unshelved files
+    /// leave the entry (the entry goes with its last file) unless `keep` is set.
+    ShelfUnshelve = "shelf.unshelve" (crate::ShelfUnshelveParams) -> Empty;
+    ShelfDelete = "shelf.delete" (crate::ShelfIdParams) -> Empty;
+    /// Diffs working-tree paths against HEAD, untracked paths included, as a binary-safe patch.
+    /// Renames need both paths. Empty when the paths are unchanged.
+    PatchCreateFromChanges = "patch.create_from_changes" (PathsParams) -> String;
+    /// Patches each commit in the order given, in `git format-patch` format.
+    PatchCreateFromCommits = "patch.create_from_commits" (crate::PatchCommitsParams) -> String;
+    /// Shows each file of a patch applied to HEAD. Fails when the patch does not apply.
+    PatchPreview = "patch.preview" (crate::PatchParams) -> Vec<crate::PatchFile>;
+    /// Applies a patch to the working tree, three-way when needed. Fails with git's message when it does not
+    /// apply, and on conflicts leaves markers and unmerged index entries.
+    PatchApply = "patch.apply" (crate::PatchParams) -> Empty;
+    /// Attributes each line of a working-tree file to the commit that last changed it.
+    Blame = "blame" (crate::BlameParams) -> crate::BlameResult;
 }
 
 /// Params or result with no fields.

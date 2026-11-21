@@ -1,6 +1,7 @@
 //! `gitsense-helper`: runs on the machine being managed and serves the
 //! GitSense protocol on stdin/stdout.
 
+mod blame;
 mod branches;
 mod changelists;
 mod changes;
@@ -13,9 +14,11 @@ mod files;
 mod git;
 mod log;
 mod ops;
+mod patch;
 mod paths;
 mod remote;
 mod repos;
+mod shelf;
 mod status;
 mod watch;
 mod worktrees;
@@ -166,6 +169,17 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::ConflictAccept::NAME => call::<p::ConflictAccept>(ctx, params, conflicts::accept),
         p::CompareCommits::NAME => call::<p::CompareCommits>(ctx, params, compare::commits),
         p::CompareFiles::NAME => call::<p::CompareFiles>(ctx, params, compare::files),
+        // Shelf, patches, blame.
+        p::ShelfList::NAME => call::<p::ShelfList>(ctx, params, shelf::list),
+        p::ShelfCreate::NAME => call::<p::ShelfCreate>(ctx, params, shelf::create),
+        p::ShelfFile::NAME => call::<p::ShelfFile>(ctx, params, shelf::file),
+        p::ShelfUnshelve::NAME => call::<p::ShelfUnshelve>(ctx, params, shelf::unshelve),
+        p::ShelfDelete::NAME => call::<p::ShelfDelete>(ctx, params, shelf::delete),
+        p::PatchCreateFromChanges::NAME => call::<p::PatchCreateFromChanges>(ctx, params, patch::create_from_changes),
+        p::PatchCreateFromCommits::NAME => call::<p::PatchCreateFromCommits>(ctx, params, patch::create_from_commits),
+        p::PatchPreview::NAME => call::<p::PatchPreview>(ctx, params, patch::preview),
+        p::PatchApply::NAME => call::<p::PatchApply>(ctx, params, patch::apply),
+        p::Blame::NAME => call::<p::Blame>(ctx, params, blame::blame),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }
