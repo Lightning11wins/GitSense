@@ -7,6 +7,7 @@ import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
 import { CenterTabs } from "./CenterTabs";
+import { OperationBanners } from "../merge/OperationBanner";
 import "./Workspace.css";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -70,6 +71,7 @@ export function Workspace({ session }: { session: Session }) {
         </nav>
         <div className="work-area">
           {disconnected && <DisconnectedBanner session={session} reason={disconnected} />}
+          <OperationBanners session={session} />
           <div className="upper">
             {leftOpen && (
               <>

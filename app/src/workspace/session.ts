@@ -3,10 +3,11 @@ import { useSyncExternalStore } from "react";
 import { call, getSettings, onSettings, onWindowEvent, type ConnectedInfo, type Settings } from "../api";
 import type { FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
 import type { DiffTab } from "./DiffView";
+import type { MergeTab } from "../merge/MergeTool";
 
 /** The push tab. `branch` limits it to one branch of one repo; otherwise it lists every repo's current branch. */
 export type PushTab = { kind: "push"; id: "push"; branch?: { repo: string; name: string }; version: number };
-export type CenterTab = DiffTab | PushTab;
+export type CenterTab = DiffTab | PushTab | MergeTab;
 
 export type StatusEntry = { status?: RepoStatus; error?: string; loading: boolean };
 
@@ -220,8 +221,9 @@ export class Session {
     await this.loadRepos("repos.list");
   }
 
-  /** Opens a working-tree file's diff against HEAD in a center tab, reusing its tab if open. */
+  /** Opens a working-tree file's diff against HEAD in a center tab, or the merge tool for a conflicted file. */
   openDiff(repo: string, change: FileChange) {
+    if (change.kind === "conflicted") return this.openMerge(repo, change.path);
     this.openTab({
       kind: "diff",
       id: `diff:${repo}:${change.path}`,
@@ -245,6 +247,11 @@ export class Session {
       left: { rev: from, path: change.orig_path ?? change.path },
       right: { rev: to, path: change.path },
     });
+  }
+
+  /** Opens the merge tool for a conflicted file. */
+  openMerge(repo: string, path: string) {
+    this.openTab({ kind: "merge", id: `merge:${repo}:${path}`, repo, path });
   }
 
   /** Opens the push tab, or reloads it when already open. */

@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
-import { useSession, type Session } from "./session";
+import { useSession, type CenterTab, type Session } from "./session";
 import { DiffView } from "./DiffView";
 import { PushView } from "./PushView";
+import { MergeTool } from "../merge/MergeTool";
 import { baseName } from "./repos";
 import "./CenterTabs.css";
 
@@ -17,10 +18,10 @@ export function CenterTabs({ session }: { session: Session }) {
           <div
             key={tab.id}
             className={`center-tab ${tab.id === active ? "active" : ""}`}
-            title={tab.kind === "diff" ? `${tab.repo}/${tab.right.path}` : "Push Commits"}
+            title={tabTitle(tab)}
             onMouseDown={(e) => (e.button === 1 ? session.closeTab(tab.id) : session.activateTab(tab.id))}
           >
-            <span>{tab.kind === "diff" ? baseName(tab.right.path) : "Push"}</span>
+            <span>{tab.kind === "diff" ? baseName(tab.right.path) : tab.kind === "merge" ? `Merge ${baseName(tab.path)}` : "Push"}</span>
             <button
               className="center-tab-close"
               title="Close"
@@ -34,9 +35,21 @@ export function CenterTabs({ session }: { session: Session }) {
       </div>
       {tabs.map((tab) => (
         <div key={tab.id} className="center-content" hidden={tab.id !== active}>
-          {tab.kind === "diff" ? <DiffView session={session} tab={tab} /> : <PushView session={session} tab={tab} />}
+          {tab.kind === "diff" ? (
+            <DiffView session={session} tab={tab} />
+          ) : tab.kind === "merge" ? (
+            <MergeTool session={session} tab={tab} />
+          ) : (
+            <PushView session={session} tab={tab} />
+          )}
         </div>
       ))}
     </>
   );
+}
+
+function tabTitle(tab: CenterTab) {
+  if (tab.kind === "diff") return `${tab.repo}/${tab.right.path}`;
+  if (tab.kind === "merge") return `Merge ${tab.repo}/${tab.path}`;
+  return "Push Commits";
 }
