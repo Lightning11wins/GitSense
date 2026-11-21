@@ -5,6 +5,7 @@ import { below, Popup } from "./Popup";
 import { RepoManager } from "./RepoManager";
 import { BranchesPopup } from "./BranchesPopup";
 import { SettingsDialog } from "./SettingsDialog";
+import { ApplyPatchDialog } from "./ApplyPatchDialog";
 import { useSession, type Session } from "./session";
 import { repoName } from "./repos";
 
@@ -12,7 +13,7 @@ type Point = { x: number; y: number };
 type Open =
   | { kind: "machine" | "repos"; at: Point }
   | { kind: "branches"; repo: string; at: Point }
-  | { kind: "manage" | "settings" }
+  | { kind: "manage" | "settings" | "applyPatch" }
   | null;
 
 export function TopBar({ session, onCommit }: { session: Session; onCommit: () => void }) {
@@ -61,6 +62,9 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
             <button className="popup-item" onClick={() => (close(), session.loadRepos("repos.scan"))}>
               Rescan Home Directory
             </button>
+            <button className="popup-item" onClick={() => setOpen({ kind: "applyPatch" })}>
+              Apply Patch from Clipboard...
+            </button>
             <button className="popup-item" disabled={!settings} onClick={() => setOpen({ kind: "settings" })}>
               Settings...
             </button>
@@ -102,6 +106,7 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
       )}
       {open?.kind === "branches" && <BranchesPopup session={session} repo={open.repo} at={open.at} onClose={close} />}
       {open?.kind === "manage" && <RepoManager session={session} onClose={close} />}
+      {open?.kind === "applyPatch" && <ApplyPatchDialog session={session} onClose={close} />}
       {open?.kind === "settings" && settings && <SettingsDialog settings={settings} onClose={close} />}
     </header>
   );

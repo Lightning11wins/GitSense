@@ -12,10 +12,11 @@ type Props = {
   focusConfirm?: boolean;
   /** Why confirming is not possible yet. Disables the confirm button. */
   blocker?: string;
+  width?: number;
 };
 
 /** A modal asking to confirm an action, with room for options. */
-export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, children, focusConfirm = true, blocker }: Props) {
+export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, children, focusConfirm = true, blocker, width = 520 }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   async function confirm() {
@@ -38,7 +39,7 @@ export function ConfirmDialog({ title, confirmLabel, onConfirm, onClose, childre
     >
       <form
         className="dialog"
-        style={{ width: 520 }}
+        style={{ width }}
         onSubmit={(e) => {
           e.preventDefault();
           confirm();

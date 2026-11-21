@@ -115,3 +115,25 @@
   resize: vertical;
   font-family: var(--font-mono);
 }
+
+.patch-preview {
+  height: 55vh;
+  display: flex;
+  gap: 8px;
+}
+
+.patch-files {
+  width: 240px;
+  flex: none;
+  max-height: none;
+}
+
+.patch-diff {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-editor);
+}
