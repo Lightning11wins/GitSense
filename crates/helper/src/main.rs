@@ -159,6 +159,7 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::Revert::NAME => call::<p::Revert>(ctx, params, ops::revert),
         p::Reset::NAME => call::<p::Reset>(ctx, params, ops::reset),
         p::CommitReword::NAME => call::<p::CommitReword>(ctx, params, commit_actions::reword),
+        p::CommitUndo::NAME => call::<p::CommitUndo>(ctx, params, commit_actions::undo),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

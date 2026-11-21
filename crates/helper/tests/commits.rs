@@ -3,7 +3,7 @@ mod common;
 use std::path::Path;
 
 use common::Machine;
-use gitsense_protocol::{CommitReword, RewordParams};
+use gitsense_protocol::{CommitReword, CommitUndo, RepoParams, RewordParams};
 
 fn s(path: &Path) -> String {
     path.display().to_string()
@@ -143,6 +143,8 @@ async fn refuses_to_reword_during_an_operation() {
 
     let err = session.conn.call::<CommitReword>(reword_params(&repo, "HEAD", "Reworded.")).await.unwrap_err();
     assert!(err.to_string().contains("a merge is in progress"), "{err}");
+    let err = session.conn.call::<CommitUndo>(RepoParams { repo: s(&repo) }).await.unwrap_err();
+    assert!(err.to_string().contains("a merge is in progress"), "{err}");
 }
 
 #[tokio::test]
@@ -164,4 +166,47 @@ async fn failed_reword_restores_the_repo() {
     assert!(err.to_string().starts_with("Failed to reword") && err.to_string().contains("refused"), "{err}");
     assert_eq!(head(&machine, &repo), tip);
     assert_eq!(machine.git(&repo, &["status", "--porcelain"]), before);
+}
+
+#[tokio::test]
+async fn undoes_the_last_commit_keeping_its_changes() {
+    let machine = Machine::new();
+    let repo = machine.repo("app");
+    let before = head(&machine, &repo);
+    commit_file(&machine, &repo, "a.txt", "Add a.");
+    std::fs::write(repo.join("README.md"), "edited\n").unwrap();
+    let session = machine.connect_local().await;
+
+    session.conn.call::<CommitUndo>(RepoParams { repo: s(&repo) }).await.unwrap();
+
+    assert_eq!(head(&machine, &repo), before);
+    assert_eq!(machine.git(&repo, &["status", "--porcelain"]), " M README.md\nA  a.txt\n");
+    assert_eq!(std::fs::read_to_string(repo.join("a.txt")).unwrap(), "a.txt\n");
+}
+
+#[tokio::test]
+async fn refuses_to_undo_unsuitable_commits() {
+    let machine = Machine::new();
+    let empty = machine.home().join("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    machine.git(&empty, &["init", "-q"]);
+    let repo = machine.repo("app");
+    let root = head(&machine, &repo);
+    let session = machine.connect_local().await;
+    let undo = async |dir: &Path| session.conn.call::<CommitUndo>(RepoParams { repo: s(dir) }).await.unwrap_err();
+
+    let err = undo(&empty).await.to_string();
+    assert!(err.starts_with("Failed to undo") && err.contains("no commits") && err.contains(&s(&empty)), "{err}");
+    let err = undo(&repo).await.to_string();
+    assert!(err.starts_with("Failed to undo") && err.contains(&format!("commit {root} is the root")), "{err}");
+
+    machine.git(&repo, &["switch", "-q", "-c", "side"]);
+    commit_file(&machine, &repo, "side.txt", "Side.");
+    machine.git(&repo, &["switch", "-q", "main"]);
+    commit_file(&machine, &repo, "main.txt", "Main.");
+    machine.git(&repo, &["merge", "-q", "--no-ff", "-m", "Merge side.", "side"]);
+    let merge = head(&machine, &repo);
+    let err = undo(&repo).await.to_string();
+    assert!(err.starts_with("Failed to undo") && err.contains(&format!("commit {merge} is a merge")), "{err}");
+    assert_eq!(head(&machine, &repo), merge);
 }

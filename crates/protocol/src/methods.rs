@@ -113,6 +113,9 @@ methods! {
     /// Changes a commit's message and nothing else: the working tree and index stay as they are. `rev` must be
     /// HEAD or an ancestor of HEAD with no merge commits between them, and no operation may be in progress.
     CommitReword = "commit.reword" (RewordParams) -> Empty;
+    /// Removes the last commit from the current branch and keeps its changes staged in the working tree. Refuses
+    /// for a merge commit, the root commit, and while an operation is in progress.
+    CommitUndo = "commit.undo" (RepoParams) -> Empty;
 }
 
 /// Params or result with no fields.

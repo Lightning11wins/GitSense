@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use gitsense_protocol::{Empty, Operation, RewordParams};
+use gitsense_protocol::{Empty, Operation, RepoParams, RewordParams};
 
 use crate::ops::{in_progress, require_settled};
 use crate::{Ctx, Error, Result, git::git};
@@ -79,5 +79,22 @@ fn restore(ctx: &Ctx, repo: &Path, fixup: &str) {
     }
     if resolve(ctx, repo, "HEAD").is_ok_and(|head| head == fixup) {
         let _ = git(ctx, repo).args(["reset", "--soft", "HEAD^"]).logged().run();
+    }
+}
+
+pub fn undo(ctx: &Ctx, params: RepoParams) -> Result<Empty> {
+    let repo = Path::new(&params.repo);
+    let what = format!("undo the last commit in '{}'", params.repo);
+    require_settled(repo, "undo the last commit")?;
+    let head =
+        resolve(ctx, repo, "HEAD").map_err(|_| Error::new(format!("Failed to {what}: there are no commits.")))?;
+    let parents = git(ctx, repo).args(["rev-list", "--parents", "--max-count=1", &head]).run()?;
+    match parents.stdout_str()?.split_whitespace().count() - 1 {
+        0 => Err(Error::new(format!("Failed to {what}: commit {head} is the root commit."))),
+        1 => {
+            git(ctx, repo).args(["reset", "--soft", "HEAD^"]).logged().run()?;
+            Ok(Empty {})
+        }
+        _ => Err(Error::new(format!("Failed to {what}: commit {head} is a merge commit."))),
     }
 }

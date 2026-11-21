@@ -405,4 +405,5 @@ export type Methods = {
   "revert": { params: RevsParams; result: Empty };
   "reset": { params: ResetParams; result: Empty };
   "commit.reword": { params: RewordParams; result: Empty };
+  "commit.undo": { params: RepoParams; result: Empty };
 };
