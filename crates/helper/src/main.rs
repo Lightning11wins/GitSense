@@ -6,6 +6,7 @@ mod changelists;
 mod changes;
 mod commit;
 mod commit_actions;
+mod conflicts;
 mod error;
 mod files;
 mod git;
@@ -160,6 +161,8 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::Reset::NAME => call::<p::Reset>(ctx, params, ops::reset),
         p::CommitReword::NAME => call::<p::CommitReword>(ctx, params, commit_actions::reword),
         p::CommitUndo::NAME => call::<p::CommitUndo>(ctx, params, commit_actions::undo),
+        p::ConflictsList::NAME => call::<p::ConflictsList>(ctx, params, conflicts::list),
+        p::ConflictAccept::NAME => call::<p::ConflictAccept>(ctx, params, conflicts::accept),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

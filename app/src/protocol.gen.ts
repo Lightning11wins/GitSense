@@ -119,6 +119,32 @@ export type CommitResult = {
  */
 hash: string, };
 
+export type Conflict = { 
+/**
+ * Path relative to the repo root.
+ */
+path: string, 
+/**
+ * The common ancestor's version exists (index stage 1).
+ */
+base: boolean, 
+/**
+ * The current branch's version exists (index stage 2).
+ */
+ours: boolean, 
+/**
+ * The incoming version exists (index stage 3).
+ */
+theirs: boolean, };
+
+export type ConflictAcceptParams = { repo: string, 
+/**
+ * Conflicted paths relative to the repo root.
+ */
+paths: Array<string>, side: ConflictSide, };
+
+export type ConflictSide = "ours" | "theirs";
+
 export type DiffFilesParams = { repo: string, 
 /**
  * None compares `to` with the empty tree.
@@ -406,4 +432,6 @@ export type Methods = {
   "reset": { params: ResetParams; result: Empty };
   "commit.reword": { params: RewordParams; result: Empty };
   "commit.undo": { params: RepoParams; result: Empty };
+  "conflicts.list": { params: RepoParams; result: Array<Conflict> };
+  "conflict.accept": { params: ConflictAcceptParams; result: Empty };
 };

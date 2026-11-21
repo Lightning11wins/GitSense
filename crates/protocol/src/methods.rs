@@ -116,6 +116,11 @@ methods! {
     /// Removes the last commit from the current branch and keeps its changes staged in the working tree. Refuses
     /// for a merge commit, the root commit, and while an operation is in progress.
     CommitUndo = "commit.undo" (RepoParams) -> Empty;
+    /// Lists conflicted paths, sorted, with which versions exist in the index.
+    ConflictsList = "conflicts.list" (RepoParams) -> Vec<Conflict>;
+    /// Resolves conflicted paths with one side's version, deleting a file that side deleted, and stages the result.
+    /// Fails without changing anything when a path is not conflicted.
+    ConflictAccept = "conflict.accept" (ConflictAcceptParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -588,4 +593,33 @@ pub struct RewordParams {
     pub rev: String,
     /// The commit's new full message. Must not be empty.
     pub message: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct Conflict {
+    /// Path relative to the repo root.
+    pub path: String,
+    /// The common ancestor's version exists (index stage 1).
+    pub base: bool,
+    /// The current branch's version exists (index stage 2).
+    pub ours: bool,
+    /// The incoming version exists (index stage 3).
+    pub theirs: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictSide {
+    /// Index stage 2: the current branch, or during a rebase the branch being rebased onto.
+    Ours,
+    /// Index stage 3: the incoming changes, or during a rebase the commit being replayed.
+    Theirs,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ConflictAcceptParams {
+    pub repo: String,
+    /// Conflicted paths relative to the repo root.
+    pub paths: Vec<String>,
+    pub side: ConflictSide,
 }
