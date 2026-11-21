@@ -249,6 +249,11 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
     run(nodes, (repo, group) => call("rollback", { repo, paths: withOrigPaths(group), delete_added: deleteAdded }));
   const deleteFiles = (nodes: FileNode[]) =>
     run(nodes, (repo, group) => call("files.delete", { repo, paths: group.map((n) => n.file.path) }));
+  const copyPatch = (nodes: FileNode[]) =>
+    call("patch.create_from_changes", { repo: nodes[0].repo.path, paths: withOrigPaths(nodes) })
+      .then((patch) => navigator.clipboard.writeText(patch))
+      .then(() => session.notify("Copied the patch to the clipboard."))
+      .catch((e) => setError(`Failed to create the patch: ${e}`));
   const shelve = (nodes: FileNode[], message: string) =>
     run(nodes, async (repo, group) => {
       try {
@@ -507,6 +512,7 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
           lists={lists}
           onNewList={() => setDialog({ kind: "newList" })}
           onMoveToList={() => setDialog({ kind: "moveToList", nodes: menu.nodes.filter((n) => n.section === "changes") })}
+          onCopyPatch={() => copyPatch(menu.nodes)}
           onShelve={() => {
             const nodes = menu.nodes.filter((n) => n.section === "changes");
             const names = new Set(nodes.map((n) => n.list));
@@ -661,6 +667,7 @@ type MenuProps = {
   onNewList: () => void;
   onMoveToList: () => void;
   onShelve: () => void;
+  onCopyPatch: () => void;
   onSetActiveList: (name: string) => void;
   onRenameList: (name: string) => void;
   onDeleteList: (name: string) => void;
@@ -696,6 +703,13 @@ function ChangesMenu(props: MenuProps) {
         {item("Rollback...", "Ctrl+Alt+Z", tracked, onRollback, "Select changed files to roll back")}
         {item("Move to Another Changelist...", "Alt+Shift+M", tracked, props.onMoveToList, "Select changed files to move")}
         {item("Shelve Changes...", "", tracked, props.onShelve, "Select changed files to shelve")}
+        {item(
+          "Copy as Patch to Clipboard",
+          "",
+          menu.nodes.length > 0 && new Set(menu.nodes.map((n) => n.repo.path)).size === 1,
+          props.onCopyPatch,
+          "Select changes of one repository",
+        )}
         <div className="popup-separator" />
         {item("New Changelist...", "", true, props.onNewList)}
         {item(
