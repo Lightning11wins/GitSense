@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import type { PatchFile } from "../protocol.gen";
-import { call } from "../api";
+import { call, readClipboard } from "../api";
 import { useSession, type Session } from "./session";
 import { baseName, dirName, repoName } from "./repos";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -36,12 +36,12 @@ export function ApplyPatchDialog({ session, onClose }: { session: Session; onClo
     (async () => {
       let text;
       try {
-        text = await navigator.clipboard.readText();
+        text = await readClipboard();
       } catch (e) {
         return !stale && setReadError(`Failed to read the clipboard: ${e}`);
       }
       if (stale) return;
-      if (!text.trim()) return setReadError("Failed to read a patch: the clipboard is empty.");
+      if (!text?.trim()) return setReadError("Failed to read a patch: the clipboard is empty.");
       setPatch(text);
       for (const r of visible) {
         const result = await preview(r.path, text);

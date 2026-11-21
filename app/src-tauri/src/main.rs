@@ -123,6 +123,20 @@ async fn request(
     connection.call_raw(&method, params).await.map_err(|e| e.to_string())
 }
 
+/// Text on the system clipboard, or None when it holds no text. Unlike the webview's clipboard API, this
+/// reads text copied from other programs.
+#[tauri::command]
+async fn read_clipboard(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD).request_text(move |_, text| {
+            let _ = send.send(text.map(String::from));
+        });
+    })
+    .map_err(|e| format!("Failed to read the clipboard: {e}"))?;
+    receive.await.map_err(|e| format!("Failed to read the clipboard: {e}"))
+}
+
 #[tauri::command]
 fn new_window(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     open_window(&app, &state, false).map_err(|e| e.to_string())
@@ -171,6 +185,7 @@ fn main() {
             last_machine,
             connect,
             request,
+            read_clipboard,
             new_window
         ])
         .run(tauri::generate_context!())

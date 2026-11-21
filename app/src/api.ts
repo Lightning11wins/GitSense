@@ -50,6 +50,11 @@ export function newWindow(): Promise<void> {
   return invoke("new_window");
 }
 
+/** Text on the system clipboard, including text copied from other programs, or null when it holds no text. */
+export function readClipboard(): Promise<string | null> {
+  return invoke("read_clipboard");
+}
+
 /** Calls a helper method on this window's machine. */
 export function call<M extends keyof Methods>(method: M, params: Methods[M]["params"]): Promise<Methods[M]["result"]> {
   return invoke("request", { method, params });

@@ -1131,6 +1131,7 @@ version = "0.1.0"
 dependencies = [
  "gitsense-client",
  "gitsense-protocol",
+ "gtk",
  "serde",
  "serde_json",
  "tauri",
