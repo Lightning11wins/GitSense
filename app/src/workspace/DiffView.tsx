@@ -72,7 +72,8 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
   const editable = working && !!loaded?.right.exists && !loaded.right.binary;
   const showText = !!loaded && !loaded.left.binary && !loaded.right.binary;
   const kind = status?.changes.find((c) => c.path === right.path)?.kind;
-  const partial = editable && (kind === "modified" || kind === "added" || kind === "renamed");
+  // Chunks are committable only against HEAD, the commit's parent.
+  const partial = editable && left.rev === "HEAD" && (kind === "modified" || kind === "added" || kind === "renamed");
   const file = fileKey(tab.repo, right.path);
   const fileExcluded = useSession(session, (s) => s.excludedFiles.has(file));
   const excludedChunks = useSession(session, (s) => s.excludedChunks[file]);
@@ -119,7 +120,7 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       },
       parent: host.current,
       revertControls: editable ? "a-to-b" : undefined,
-      renderRevertControl: revertButton,
+      renderRevertControl: () => revertButton(left.rev),
       gutter: true,
       diffConfig: DIFF_CONFIG,
       collapseUnchanged: { margin: 4, minSize: 8 },
@@ -206,10 +207,10 @@ function sideLabel(rev: string, detail: string) {
   return `${short}: ${detail}`;
 }
 
-function revertButton() {
+function revertButton(rev: string) {
   const button = document.createElement("button");
   button.textContent = "\u00bb";
-  button.title = "Revert this change to HEAD";
+  button.title = `Revert this change to ${rev}`;
   return button;
 }
 
