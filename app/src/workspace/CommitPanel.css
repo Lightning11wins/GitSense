@@ -65,3 +65,7 @@
 .grow {
   flex: 1;
 }
+
+.active-list {
+  font-weight: 600;
+}

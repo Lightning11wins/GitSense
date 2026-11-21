@@ -1,7 +1,7 @@
 // State of one connected machine: repos, their statuses, and the Git Console.
 import { useSyncExternalStore } from "react";
 import { call, getSettings, onSettings, onWindowEvent, type ConnectedInfo, type Settings } from "../api";
-import type { FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
+import type { Changelists, FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
 import type { DiffTab } from "./DiffView";
 import type { MergeTab } from "../merge/MergeTool";
 import type { CompareTab } from "../log/CompareView";
@@ -10,7 +10,8 @@ import type { CompareTab } from "../log/CompareView";
 export type PushTab = { kind: "push"; id: "push"; branch?: { repo: string; name: string }; version: number };
 export type CenterTab = DiffTab | PushTab | MergeTab | CompareTab;
 
-export type StatusEntry = { status?: RepoStatus; error?: string; loading: boolean };
+/** A repo's status. `status` and `changelists` are loaded together; each tracked change is in one of the lists. */
+export type StatusEntry = { status?: RepoStatus; changelists?: Changelists; error?: string; loading: boolean };
 
 export type SessionState = {
   info: ConnectedInfo;
@@ -142,13 +143,111 @@ export class Session {
     this.patchStatus(repo, { loading: true });
     try {
       const status = await call("status", { repo });
-      this.patchStatus(repo, { status, error: undefined, loading: false });
+      const changelists = await this.assignNewChanges(repo, status, await call("changelists.get", { repo }));
+      this.patchStatus(repo, { status, changelists, error: undefined, loading: false });
     } catch (e) {
       this.patchStatus(repo, { error: String(e), loading: false });
     }
     const again = this.refreshing.get(repo);
     this.refreshing.delete(repo);
     if (again) this.refreshStatus(repo);
+  }
+
+  /**
+   * Assigns tracked changes that are in no changelist to the active one, so they stay in it when another
+   * list becomes active. Returns the updated lists.
+   */
+  private async assignNewChanges(repo: string, status: RepoStatus, changelists: Changelists): Promise<Changelists> {
+    const assigned = new Set(changelists.lists.flatMap((l) => l.paths));
+    const paths = status.changes
+      .filter((c) => c.kind !== "untracked" && !assigned.has(c.path) && !(c.orig_path && assigned.has(c.orig_path)))
+      .map((c) => c.path);
+    if (paths.length === 0) return changelists;
+    return call("changelists.move_paths", { repo, name: changelists.active, paths });
+  }
+
+  /** Repos whose changelists are loaded, with those lists. */
+  private loadedChangelists(): [string, Changelists][] {
+    return this.visibleRepos().flatMap((r) => {
+      const lists = this.state.statuses[r.path]?.changelists;
+      return lists ? [[r.path, lists] as [string, Changelists]] : [];
+    });
+  }
+
+  /**
+   * Runs a changelist change on each repo, storing the lists it returns. Changelists act as one set across
+   * repos, so each change applies to every repo it concerns. Rejects with every repo's failure.
+   */
+  private async changeLists(repos: string[], change: (repo: string, lists: Changelists) => Promise<Changelists>) {
+    const failures: string[] = [];
+    for (const repo of repos) {
+      const lists = this.state.statuses[repo]?.changelists;
+      if (!lists) continue;
+      try {
+        this.patchStatus(repo, { changelists: await change(repo, lists) });
+        // A refresh in flight may have read the lists before this change.
+        if (this.refreshing.has(repo)) this.refreshing.set(repo, true);
+      } catch (e) {
+        failures.push(String(e));
+      }
+    }
+    if (failures.length) throw new Error(failures.join("\n"));
+  }
+
+  /** Adds an empty changelist to every repo, optionally making it active. */
+  async createChangelist(name: string, active: boolean) {
+    const repos = this.loadedChangelists();
+    if (repos.some(([, lists]) => lists.lists.some((l) => l.name === name))) {
+      throw new Error(`Failed to create changelist '${name}': that name is already used.`);
+    }
+    await this.changeLists(
+      repos.map(([repo]) => repo),
+      (repo) => call("changelists.create", { repo, name }),
+    );
+    if (active) await this.setActiveChangelist(name);
+  }
+
+  async renameChangelist(name: string, newName: string) {
+    const repos = this.loadedChangelists().filter(([, lists]) => lists.lists.some((l) => l.name === name));
+    if (newName !== name && repos.some(([, lists]) => lists.lists.some((l) => l.name === newName))) {
+      throw new Error(`Failed to rename changelist '${name}' to '${newName}': that name is already used.`);
+    }
+    await this.changeLists(
+      repos.map(([repo]) => repo),
+      (repo) => call("changelists.rename", { repo, name, new_name: newName }),
+    );
+  }
+
+  /** Deletes a changelist, moving its files to the default list, which becomes active if it was. */
+  async deleteChangelist(name: string) {
+    const repos = this.loadedChangelists().filter(([, lists]) => lists.lists.some((l) => l.name === name));
+    await this.changeLists(
+      repos.map(([repo]) => repo),
+      (repo) => call("changelists.delete", { repo, name }),
+    );
+  }
+
+  /** Makes a changelist active in every repo, creating it where missing. Existing changes keep their lists. */
+  async setActiveChangelist(name: string) {
+    await this.changeLists(
+      this.loadedChangelists().map(([repo]) => repo),
+      async (repo, lists) => {
+        const status = this.state.statuses[repo]?.status;
+        if (status) lists = await this.assignNewChanges(repo, status, lists);
+        if (!lists.lists.some((l) => l.name === name)) await call("changelists.create", { repo, name });
+        return call("changelists.set_active", { repo, name });
+      },
+    );
+  }
+
+  /** Moves files to a changelist, creating it in their repos where missing. */
+  async moveToChangelist(name: string, files: { repo: string; path: string }[]) {
+    const byRepo = new Map<string, string[]>();
+    for (const f of files) byRepo.set(f.repo, [...(byRepo.get(f.repo) ?? []), f.path]);
+    await this.changeLists([...byRepo.keys()], async (repo, lists) => {
+      if (!lists.lists.some((l) => l.name === name)) await call("changelists.create", { repo, name });
+      return call("changelists.move_paths", { repo, name, paths: byRepo.get(repo)! });
+    });
   }
 
   private patchStatus(repo: string, patch: Partial<StatusEntry>) {

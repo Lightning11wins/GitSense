@@ -1,28 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, FileText, FolderGit2, History, RefreshCw } from "lucide-react";
-import type { FileChange, IgnoreFile, Repo } from "../protocol.gen";
+import type { Changelists, FileChange, IgnoreFile, Repo, RepoStatus } from "../protocol.gen";
 import { call } from "../api";
 import { useSession, type Session } from "./session";
 import { baseName, dirName, repoName } from "./repos";
 import { Popup } from "./Popup";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { InputDialog } from "./InputDialog";
+import { MoveToChangelistDialog, NewChangelistDialog } from "./ChangelistDialogs";
 import { recentMessages, rememberMessage } from "./commitHistory";
 import "./CommitPanel.css";
 
 type Section = "changes" | "unversioned";
-type FileNode = { key: string; section: Section; repo: Repo; file: FileChange };
+/** A changed file. Tracked changes have the name of their changelist. */
+type FileNode = { key: string; section: Section; repo: Repo; file: FileChange; list?: string };
+type RepoGroup = { repo: Repo; branch: string | null; files: FileNode[] };
+/** A changelist across repos. */
+type ListGroup = { name: string; active: boolean; isDefault: boolean; groups: RepoGroup[] };
 type TreeRow = {
   key: string;
   depth: number;
   /** Whether the node is expanded; undefined for files. */
   open?: boolean;
   files: FileNode[];
+  /** The changelist this row stands for, on changelist rows. */
+  list?: string;
   content: React.ReactNode;
 };
-type Menu = { at: { x: number; y: number }; nodes: FileNode[]; ignoreTargets?: IgnoreFile[] };
-type Dialog = { kind: "rollback"; nodes: FileNode[]; deleteAdded: boolean } | { kind: "delete"; nodes: FileNode[] };
+/** A context menu. `lists` are the changelists of the selected rows and files. */
+type Menu = { at: { x: number; y: number }; nodes: FileNode[]; lists: string[]; ignoreTargets?: IgnoreFile[] };
+type Dialog =
+  | { kind: "rollback"; nodes: FileNode[]; deleteAdded: boolean }
+  | { kind: "delete"; nodes: FileNode[] }
+  | { kind: "newList" }
+  | { kind: "moveToList"; nodes: FileNode[] }
+  | { kind: "renameList"; name: string }
+  | { kind: "deleteList"; name: string; count: number };
 
-/** The Commit tool window: changes grouped by repo, inclusion checkboxes, and the commit message. */
+/** The Commit tool window: changes grouped by changelist and repo, inclusion checkboxes, and the commit message. */
 export function CommitPanel({ session }: { session: Session }) {
   const repos = useSession(session, (s) => s.repos);
   const statuses = useSession(session, (s) => s.statuses);
@@ -44,26 +59,44 @@ export function CommitPanel({ session }: { session: Session }) {
   const [dialog, setDialog] = useState<Dialog>();
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
-  // Tree data: sections, then repos, then files.
-  const sections: Record<Section, { repo: Repo; branch: string | null; files: FileNode[] }[]> = {
-    changes: [],
-    unversioned: [],
+  // Tree data: changelists, then repos, then files; unversioned files by repo.
+  const lists: ListGroup[] = [];
+  const listGroup = (name: string) => {
+    let list = lists.find((l) => l.name === name);
+    if (!list) lists.push((list = { name, active: false, isDefault: false, groups: [] }));
+    return list;
   };
+  const unversionedGroups: RepoGroup[] = [];
   const errors: { repo: Repo; error: string }[] = [];
+  const loaded: { repo: Repo; status: RepoStatus; changelists: Changelists }[] = [];
   for (const repo of repos) {
     if (repo.hidden) continue;
     const entry = statuses[repo.path];
     if (entry?.error) errors.push({ repo, error: entry.error });
-    const status = entry?.status;
-    if (!status) continue;
-    for (const section of ["changes", "unversioned"] as const) {
-      const files = status.changes
-        .filter((c) => (c.kind === "untracked") === (section === "unversioned"))
-        .map((file) => ({ key: `${section}\0${repo.path}\0${file.path}`, section, repo, file }));
-      if (files.length) sections[section].push({ repo, branch: status.branch, files });
-    }
+    if (entry?.status && entry.changelists) loaded.push({ repo, status: entry.status, changelists: entry.changelists });
   }
-  const allFiles = [...sections.changes, ...sections.unversioned].flatMap((g) => g.files);
+  // Default lists first, then the others in each repo's order.
+  for (const { changelists } of loaded) listGroup(changelists.lists[0].name).isDefault = true;
+  for (const { changelists } of loaded) {
+    for (const l of changelists.lists) listGroup(l.name).active ||= l.name === changelists.active;
+  }
+  for (const { repo, status, changelists } of loaded) {
+    const listOf = new Map(changelists.lists.flatMap((l) => l.paths.map((path) => [path, l.name])));
+    const byList = new Map<string, FileNode[]>();
+    const unversioned: FileNode[] = [];
+    for (const file of status.changes) {
+      if (file.kind === "untracked") {
+        unversioned.push({ key: `unversioned\0${repo.path}\0${file.path}`, section: "unversioned", repo, file });
+        continue;
+      }
+      const list = listOf.get(file.path) ?? (file.orig_path && listOf.get(file.orig_path)) ?? changelists.active;
+      const node: FileNode = { key: `changes\0${repo.path}\0${file.path}`, section: "changes", repo, file, list };
+      byList.set(list, [...(byList.get(list) ?? []), node]);
+    }
+    for (const [list, files] of byList) listGroup(list).groups.push({ repo, branch: status.branch, files });
+    if (unversioned.length) unversionedGroups.push({ repo, branch: status.branch, files: unversioned });
+  }
+  const allFiles = [...lists.flatMap((l) => l.groups), ...unversionedGroups].flatMap((g) => g.files);
 
   const isIncluded = (node: FileNode) =>
     node.section === "changes" ? !excluded.has(node.key) : includedUnversioned.has(node.key);
@@ -79,31 +112,11 @@ export function CommitPanel({ session }: { session: Session }) {
     setIncludedUnversioned((set) => update(set, "unversioned", value));
   }
 
-  // Visible rows, in order.
+  // Visible rows, in order. With only the default changelist, it shows only when it has files.
   const rows: TreeRow[] = [];
-  for (const [section, title] of [
-    ["changes", "Changes"],
-    ["unversioned", "Unversioned Files"],
-  ] as const) {
-    const groups = sections[section];
-    const files = groups.flatMap((g) => g.files);
-    if (files.length === 0) continue;
-    const open = !collapsed.has(section);
-    rows.push({
-      key: section,
-      depth: 0,
-      open,
-      files,
-      content: (
-        <>
-          <span className="label section-label">{title}</span>
-          <span className="hint">{files.length === 1 ? "1 file" : `${files.length} files`}</span>
-        </>
-      ),
-    });
-    if (!open) continue;
+  const pushRepoGroups = (parent: string, groups: RepoGroup[]) => {
     for (const group of groups) {
-      const groupKey = `${section}\0${group.repo.path}`;
+      const groupKey = `${parent}\0${group.repo.path}`;
       const groupOpen = !collapsed.has(groupKey);
       rows.push({
         key: groupKey,
@@ -137,6 +150,33 @@ export function CommitPanel({ session }: { session: Session }) {
         });
       }
     }
+  };
+  const pushTopRow = (key: string, title: string, className: string, files: FileNode[], list?: string) => {
+    const open = files.length > 0 && !collapsed.has(key);
+    rows.push({
+      key,
+      depth: 0,
+      open: files.length ? open : undefined,
+      files,
+      list,
+      content: (
+        <>
+          <span className={`label ${className}`}>{title}</span>
+          <span className="hint">{fileCount(files.length)}</span>
+        </>
+      ),
+    });
+    return open;
+  };
+  for (const list of lists) {
+    const files = list.groups.flatMap((g) => g.files);
+    if (files.length === 0 && lists.length === 1) continue;
+    const key = `list\0${list.name}`;
+    if (pushTopRow(key, list.name, list.active ? "active-list" : "", files, list.name)) pushRepoGroups(key, list.groups);
+  }
+  const unversionedFiles = unversionedGroups.flatMap((g) => g.files);
+  if (unversionedFiles.length && pushTopRow("unversioned", "Unversioned Files", "section-label", unversionedFiles)) {
+    pushRepoGroups("unversioned", unversionedGroups);
   }
 
   const filesOf = (keys: Set<string>) => uniqueFiles(rows.filter((r) => keys.has(r.key)).flatMap((r) => r.files));
@@ -209,7 +249,9 @@ export function CommitPanel({ session }: { session: Session }) {
     }
     const nodes = filesOf(keys);
     const at = { x: e.clientX, y: e.clientY };
-    setMenu({ at, nodes });
+    const menuLists = new Set(rows.flatMap((r) => (keys.has(r.key) && r.list !== undefined ? [r.list] : [])));
+    for (const node of nodes) if (node.list !== undefined) menuLists.add(node.list);
+    setMenu({ at, nodes, lists: [...menuLists] });
     const others = nodes.filter((n) => n.section === "unversioned");
     if (others.length && new Set(others.map((n) => n.repo.path)).size === 1) {
       try {
@@ -237,6 +279,8 @@ export function CommitPanel({ session }: { session: Session }) {
       showDiff(selectedFiles);
     } else if (ctrl && e.altKey && key === "z" && tracked.length) {
       setDialog({ kind: "rollback", nodes: tracked, deleteAdded: false });
+    } else if (e.altKey && e.shiftKey && !ctrl && key === "m" && tracked.length) {
+      setDialog({ kind: "moveToList", nodes: tracked });
     } else if (ctrl && e.altKey && key === "a" && unversioned.length) {
       addToVcs(unversioned);
     } else if (e.key === "Delete" && unversioned.length) {
@@ -344,6 +388,7 @@ export function CommitPanel({ session }: { session: Session }) {
               <input
                 type="checkbox"
                 className="include"
+                style={row.files.length ? undefined : { visibility: "hidden" }}
                 checked={state === "all"}
                 ref={(el) => {
                   if (el) el.indeterminate = state === "some";
@@ -413,6 +458,16 @@ export function CommitPanel({ session }: { session: Session }) {
           onIgnore={(file) => ignore(menu.nodes.filter((n) => n.section === "unversioned"), file)}
           onDelete={() => setDialog({ kind: "delete", nodes: menu.nodes.filter((n) => n.section === "unversioned") })}
           onRefresh={session.refreshAll}
+          lists={lists}
+          onNewList={() => setDialog({ kind: "newList" })}
+          onMoveToList={() => setDialog({ kind: "moveToList", nodes: menu.nodes.filter((n) => n.section === "changes") })}
+          onSetActiveList={(name) => reportErrors(session.setActiveChangelist(name))}
+          onRenameList={(name) => setDialog({ kind: "renameList", name })}
+          onDeleteList={(name) => {
+            const count = lists.find((l) => l.name === name)?.groups.reduce((n, g) => n + g.files.length, 0) ?? 0;
+            if (count) setDialog({ kind: "deleteList", name, count });
+            else reportErrors(session.deleteChangelist(name));
+          }}
         />
       )}
       {historyAt && (
@@ -472,6 +527,46 @@ export function CommitPanel({ session }: { session: Session }) {
           <FileList nodes={dialog.nodes} home={home} />
         </ConfirmDialog>
       )}
+      {dialog?.kind === "newList" && (
+        <NewChangelistDialog
+          onCreate={(name, active) => session.createChangelist(name, active)}
+          onClose={() => setDialog(undefined)}
+        />
+      )}
+      {dialog?.kind === "moveToList" && (
+        <MoveToChangelistDialog
+          names={lists.map((l) => l.name)}
+          from={new Set(dialog.nodes.map((n) => n.list)).size === 1 ? dialog.nodes[0].list : undefined}
+          count={dialog.nodes.length}
+          onMove={async (name, isNew) => {
+            if (isNew) await session.createChangelist(name, false);
+            await session.moveToChangelist(name, dialog.nodes.map((n) => ({ repo: n.repo.path, path: n.file.path })));
+          }}
+          onClose={() => setDialog(undefined)}
+        />
+      )}
+      {dialog?.kind === "renameList" && (
+        <InputDialog
+          title="Rename Changelist"
+          label="Name"
+          initial={dialog.name}
+          confirmLabel="Rename"
+          onConfirm={(name) => session.renameChangelist(dialog.name, name)}
+          onClose={() => setDialog(undefined)}
+        />
+      )}
+      {dialog?.kind === "deleteList" && (
+        <ConfirmDialog
+          title="Delete Changelist"
+          confirmLabel="Delete"
+          onClose={() => setDialog(undefined)}
+          onConfirm={() => session.deleteChangelist(dialog.name)}
+        >
+          <p>
+            Delete changelist '{dialog.name}'? Its {fileCount(dialog.count)} will move to the default changelist.
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   );
 }
@@ -499,10 +594,20 @@ type MenuProps = {
   onIgnore: (file: IgnoreFile) => void;
   onDelete: () => void;
   onRefresh: () => void;
+  lists: ListGroup[];
+  onNewList: () => void;
+  onMoveToList: () => void;
+  onSetActiveList: (name: string) => void;
+  onRenameList: (name: string) => void;
+  onDeleteList: (name: string) => void;
 };
 
-function ChangesMenu({ menu, onClose, onShowDiff, onRollback, onAdd, onIgnore, onDelete, onRefresh }: MenuProps) {
+function ChangesMenu(props: MenuProps) {
+  const { menu, onClose, onShowDiff, onRollback, onAdd, onIgnore, onDelete, onRefresh } = props;
   const tracked = menu.nodes.some((n) => n.section === "changes");
+  const target = menu.lists.length === 1 ? props.lists.find((l) => l.name === menu.lists[0]) : undefined;
+  const targetWhy = "Select one changelist";
+  const activeLists = props.lists.filter((l) => l.active);
   const unversioned = menu.nodes.filter((n) => n.section === "unversioned");
   const oneRepo = new Set(unversioned.map((n) => n.repo.path)).size === 1;
   const item = (label: string, hint: string, enabled: boolean, action: () => void, why?: string) => (
@@ -525,6 +630,24 @@ function ChangesMenu({ menu, onClose, onShowDiff, onRollback, onAdd, onIgnore, o
       <div className="popup-list" style={{ paddingTop: 4 }}>
         {item("Show Diff", "Ctrl+D", menu.nodes.length > 0, onShowDiff)}
         {item("Rollback...", "Ctrl+Alt+Z", tracked, onRollback, "Select changed files to roll back")}
+        {item("Move to Another Changelist...", "Alt+Shift+M", tracked, props.onMoveToList, "Select changed files to move")}
+        <div className="popup-separator" />
+        {item("New Changelist...", "", true, props.onNewList)}
+        {item(
+          "Set Active Changelist",
+          "",
+          !!target && !(target.active && activeLists.length === 1),
+          () => props.onSetActiveList(target!.name),
+          target ? "This changelist is already active" : targetWhy,
+        )}
+        {item("Rename Changelist...", "", !!target, () => props.onRenameList(target!.name), targetWhy)}
+        {item(
+          "Delete Changelist",
+          "",
+          !!target && !target.isDefault,
+          () => props.onDeleteList(target!.name),
+          target ? "The default changelist can't be deleted" : targetWhy,
+        )}
         <div className="popup-separator" />
         {item("Add to VCS", "Ctrl+Alt+A", unversioned.length > 0, onAdd, "Select unversioned files to add")}
         {item("Delete...", "Delete", unversioned.length > 0, onDelete, "Select unversioned files to delete")}
@@ -548,6 +671,10 @@ function ChangesMenu({ menu, onClose, onShowDiff, onRollback, onAdd, onIgnore, o
 function ignoreLabel(file: IgnoreFile): string {
   if (file.kind === "exclude") return ".git/info/exclude";
   return file.dir ? `${file.dir}/.gitignore` : ".gitignore";
+}
+
+function fileCount(count: number): string {
+  return count === 0 ? "" : count === 1 ? "1 file" : `${count} files`;
 }
 
 function withOrigPaths(nodes: FileNode[]): string[] {
