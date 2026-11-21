@@ -85,3 +85,19 @@
   margin: 0;
   cursor: pointer;
 }
+
+.diff-host .cm-blame-gutter .cm-gutterElement {
+  width: 170px;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui, inherit);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.diff-host .cm-blame-gutter .cm-gutterElement:hover {
+  color: var(--text);
+}

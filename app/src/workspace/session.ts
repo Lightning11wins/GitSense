@@ -31,6 +31,8 @@ export type SessionState = {
   activeTab?: string;
   /** Increments to ask the commit panel to focus its message box. */
   commitFocusRequests: number;
+  /** A commit for the Log tab to show and select. */
+  logFocus?: { repo: string; hash: string };
   /** Tracked changes left out of the next commit, by `fileKey`. Other tracked changes are included. */
   excludedFiles: ReadonlySet<string>;
   /**
@@ -431,6 +433,15 @@ export class Session {
   private openTab(tab: CenterTab) {
     const tabs = this.state.tabs.some((t) => t.id === tab.id) ? this.state.tabs : [...this.state.tabs, tab];
     this.set({ tabs, activeTab: tab.id });
+  }
+
+  /** Asks the Log tab to show and select a commit. */
+  showInLog(repo: string, hash: string) {
+    this.set({ logFocus: { repo, hash } });
+  }
+
+  clearLogFocus() {
+    this.set({ logFocus: undefined });
   }
 
   requestCommitFocus() {

@@ -19,6 +19,11 @@ export function Workspace({ session }: { session: Session }) {
   const [bottomTab, setBottomTab] = useState<BottomTab | null>("log");
   const [bottomHeight, setBottomHeight] = useState(280);
   const disconnected = useSession(session, (s) => s.disconnected);
+  const logFocus = useSession(session, (s) => s.logFocus);
+
+  useEffect(() => {
+    if (logFocus) setBottomTab("log");
+  }, [logFocus]);
 
   const toggleBottom = (tab: BottomTab) => setBottomTab((current) => (current === tab ? null : tab));
   const focusCommit = () => {

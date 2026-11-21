@@ -52,6 +52,8 @@ export function LogView({ session }: { session: Session }) {
   const [popup, setPopup] = useState<FilterPopup>();
   const [menu, setMenu] = useState<Point>();
   const [dialog, setDialog] = useState<Dialog>();
+  const [focus, setFocus] = useState<{ key: string; hash: string }>();
+  const logFocus = useSession(session, (s) => s.logFocus);
   const query = useRef<Query>(undefined);
   const list = useRef<HTMLDivElement>(null);
 
@@ -289,6 +291,35 @@ export function LogView({ session }: { session: Session }) {
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 10);
   const visible = rows.slice(first, lastVisible + 10);
   const loading = Object.values(logs).some((l) => l.loading);
+
+  useEffect(() => {
+    if (!logFocus) return;
+    session.clearLogFocus();
+    const commonDir = allRepos.find((r) => r.path === logFocus.repo)?.common_dir;
+    const group = repos.find((g) => allRepos.find((r) => r.path === g)?.common_dir === commonDir) ?? logFocus.repo;
+    setFocus({ key: `${group}\0${logFocus.hash}`, hash: logFocus.hash });
+  }, [logFocus]);
+
+  // Select the focused commit once loaded, searching for it by hash when the current filters hide it.
+  useEffect(() => {
+    if (!focus) return;
+    const index = rows.findIndex((r) => rowKey(r) === focus.key);
+    if (index >= 0) {
+      setFocus(undefined);
+      setAnchor(index);
+      setSelected([focus.key]);
+      const el = list.current!;
+      el.scrollTop = Math.max(0, index * ROW_HEIGHT - el.clientHeight / 2);
+    } else if (loading || Object.keys(logs).length === 0) {
+      return;
+    } else if (filters.text === focus.hash) {
+      setFocus(undefined);
+      session.notify(`Failed to find commit ${focus.hash.slice(0, 8)} in the log`);
+    } else {
+      setSearch(focus.hash);
+      setFilters({ text: focus.hash, excluded: [] });
+    }
+  }, [focus, rows, loading]);
   const errors = Object.entries(logs).filter(([, l]) => l.error);
   const authors = useMemo(() => [...new Set(rows.map((r) => r.commit.author_name))].sort(), [rows]);
   const multiRepo = included.length > 1;

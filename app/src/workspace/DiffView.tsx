@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, UserRound } from "lucide-react";
 import { MergeView, goToNextChunk, goToPreviousChunk } from "@codemirror/merge";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
 import { Annotation, Compartment, EditorState, Transaction, type Extension } from "@codemirror/state";
@@ -10,6 +10,7 @@ import type { FileContent } from "../protocol.gen";
 import { call } from "../api";
 import { fileKey, useSession, type Session } from "./session";
 import { chunkGutter, setChunkInclusion } from "./chunkGutter";
+import { blameGutter, setBlame } from "./blameGutter";
 import { DIFF_CONFIG } from "./partial";
 import { editorTheme, mergeTheme } from "./editorTheme";
 import "./DiffView.css";
@@ -77,6 +78,11 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
   const file = fileKey(tab.repo, right.path);
   const fileExcluded = useSession(session, (s) => s.excludedFiles.has(file));
   const excludedChunks = useSession(session, (s) => s.excludedChunks[file]);
+  const [annotate, setAnnotate] = useState(false);
+  const [blameError, setBlameError] = useState<string>();
+  const blameSlot = useRef(new Compartment());
+  const canAnnotate = editable && kind !== "added" && kind !== "untracked";
+  const blame = annotate && canAnnotate ? blameGutter((hash) => session.showInLog(tab.repo, hash)) : [];
 
   // Build the editors once per tab and editability; later loads update their text in place.
   useEffect(() => {
@@ -105,6 +111,7 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
         extensions: [
           ...base(workText),
           editable ? [history(), highlightActiveLine(), keymap.of([...defaultKeymap, ...historyKeymap])] : [],
+          blameSlot.current.of(blame),
           partial
             ? chunkGutter((keys, key, included) => session.setChunkIncluded(tab.repo, right.path, keys, key, included))
             : [],
@@ -143,6 +150,24 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
     };
     // Text changes are applied by the effect below, without rebuilding the editors.
   }, [showText, editable, partial, tab.repo, right.path]);
+
+  useEffect(() => {
+    merge.current?.b.dispatch({ effects: blameSlot.current.reconfigure(blame) });
+  }, [annotate, canAnnotate]);
+
+  // Blame what is on disk, which the editor matches once its edits are saved.
+  useEffect(() => {
+    setBlameError(undefined);
+    if (!annotate || !canAnnotate) return;
+    let stale = false;
+    call("blame", { repo: tab.repo, path: right.path }).then(
+      (result) => !stale && merge.current?.b.dispatch({ effects: setBlame.of(result) }),
+      (e) => !stale && setBlameError(`Failed to annotate: ${e}`),
+    );
+    return () => {
+      stale = true;
+    };
+  }, [annotate, canAnnotate, loaded, showText, editable, partial, tab.repo, right.path]);
 
   useEffect(() => {
     merge.current?.b.dispatch({ effects: setChunkInclusion.of({ fileExcluded, excluded: new Set(excludedChunks) }) });
@@ -186,6 +211,16 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
         </span>
         <span className="spacer" />
         {saveError && <span className="error-text">{saveError}</span>}
+        {blameError && <span className="error-text">{blameError}</span>}
+        {canAnnotate && (
+          <button
+            className={`icon-button ${annotate ? "active" : ""}`}
+            title={annotate ? "Close Annotations" : "Annotate with Git Blame"}
+            onClick={() => setAnnotate((a) => !a)}
+          >
+            <UserRound size={16} />
+          </button>
+        )}
       </div>
       {showText && (
         <div className="diff-sides secondary">
