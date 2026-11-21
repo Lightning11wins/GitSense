@@ -4,16 +4,14 @@ import type { Branches, LocalBranch, RemoteBranch, Worktree } from "../protocol.
 import { call } from "../api";
 import { useSession, type Session } from "./session";
 import { repoName } from "./repos";
-import { Popup } from "./Popup";
+import { Menu, Popup, type MenuAction, type Point } from "./Popup";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { InputDialog } from "./InputDialog";
 
-type Point = { x: number; y: number };
 type Item =
   | { kind: "local"; branch: LocalBranch }
   | { kind: "remote"; branch: RemoteBranch }
   | { kind: "worktree"; worktree: Worktree };
-type Action = { label: string; hint?: string; disabled?: string; run: () => void } | "separator";
 type Dialog =
   | { kind: "new"; start: string; name: string; checkout: boolean }
   | { kind: "revision" }
@@ -100,7 +98,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  function actions(item: Item): Action[] {
+  function actions(item: Item): MenuAction[] {
     if (item.kind === "worktree") {
       const w = item.worktree;
       return [
@@ -391,32 +389,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
           {data && items.length === 0 && filter && <div className="secondary tree-message">No matches</div>}
         </div>
       </Popup>
-      {menu && (
-        <Popup at={menu.at} onClose={() => setMenu(undefined)} width={340}>
-          <div className="popup-list">
-            {actions(menu.item).map((a, i) =>
-              a === "separator" ? (
-                <div key={i} className="popup-separator" />
-              ) : (
-                <button
-                  key={i}
-                  className="popup-item"
-                  disabled={!!a.disabled}
-                  title={a.disabled}
-                  autoFocus={i === 0}
-                  onClick={() => {
-                    setMenu(undefined);
-                    a.run();
-                  }}
-                >
-                  {a.label}
-                  {a.hint && <span className="hint">{a.hint}</span>}
-                </button>
-              ),
-            )}
-          </div>
-        </Popup>
-      )}
+      {menu && <Menu at={menu.at} actions={actions(menu.item)} onClose={() => setMenu(undefined)} width={340} />}
     </>
   );
 }

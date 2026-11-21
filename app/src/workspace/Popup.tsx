@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+export type Point = { x: number; y: number };
+
 type Props = {
   /** Screen position of the popup's top-left corner. */
-  at: { x: number; y: number };
+  at: Point;
   onClose: () => void;
   children: ReactNode;
   width?: number;
@@ -35,7 +37,40 @@ export function Popup({ at, onClose, children, width }: Props) {
 }
 
 /** Position just below an element, for opening a popup from a button. */
-export function below(element: Element): { x: number; y: number } {
+export function below(element: Element): Point {
   const rect = element.getBoundingClientRect();
   return { x: rect.left, y: rect.bottom + 4 };
+}
+
+/** A menu action. `disabled` says why it is unavailable. */
+export type MenuAction = { label: string; hint?: string; disabled?: string; run: () => void } | "separator";
+
+/** A popup menu of actions. Choosing one closes the menu, then runs it. */
+export function Menu({ at, actions, onClose, width }: { at: Point; actions: MenuAction[]; onClose: () => void; width?: number }) {
+  return (
+    <Popup at={at} onClose={onClose} width={width}>
+      <div className="popup-list">
+        {actions.map((a, i) =>
+          a === "separator" ? (
+            <div key={i} className="popup-separator" />
+          ) : (
+            <button
+              key={i}
+              className="popup-item"
+              disabled={!!a.disabled}
+              title={a.disabled}
+              autoFocus={i === 0}
+              onClick={() => {
+                onClose();
+                a.run();
+              }}
+            >
+              {a.label}
+              {a.hint && <span className="hint">{a.hint}</span>}
+            </button>
+          ),
+        )}
+      </div>
+    </Popup>
+  );
 }
