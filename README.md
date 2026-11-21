@@ -35,7 +35,7 @@ This produces a `.deb` and an AppImage in `target/release/bundle/`.
 
 Launch GitSense and pick **This computer** or a host from your `~/.ssh/config`. GitSense automatically detects repos in that machine's home directory.
 
-Remote machines need only `sh`, coreutils, and git 2.34 or newer. On the remote machine, GitSense uses your system `ssh`; so your SSH config, keys, and agent work as usual. On first connect, it uploads a small helper program (about 1.3 MB) to `~/.cache/gitsense/`, creating a remote GitSense server.
+Remote machines need only `sh`, coreutils, and git 2.34 or newer. GitSense connects using your computer's `ssh` command, so your SSH config, keys, and agent work as usual. On first connect, it uploads a small helper program (about 1.3 MB) to `~/.cache/gitsense/`, creating a remote GitSense server.
 
 ## Development
 
