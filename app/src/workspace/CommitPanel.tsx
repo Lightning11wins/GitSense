@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, FileText, FolderGit2, History, RefreshCw } from "lucide-react";
-import type { Changelists, FileChange, IgnoreFile, Repo, RepoStatus } from "../protocol.gen";
+import type { Changelists, CommitContent, FileChange, IgnoreFile, Repo, RepoStatus } from "../protocol.gen";
 import { call } from "../api";
-import { useSession, type Session } from "./session";
+import { fileKey, readTexts, useSession, type Session } from "./session";
+import { keyedChunks, partialText, pruneChunks, toDoc } from "./partial";
 import { baseName, dirName, repoName } from "./repos";
 import { Popup } from "./Popup";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -12,6 +13,8 @@ import { recentMessages, rememberMessage } from "./commitHistory";
 import "./CommitPanel.css";
 
 type Section = "changes" | "unversioned";
+/** How much of a file or group goes into the next commit. */
+type Inclusion = "all" | "some" | "none";
 /** A changed file. Tracked changes have the name of their changelist. */
 type FileNode = { key: string; section: Section; repo: Repo; file: FileChange; list?: string };
 type RepoGroup = { repo: Repo; branch: string | null; files: FileNode[] };
@@ -46,8 +49,9 @@ export function CommitPanel({ session }: { session: Session }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchor, setAnchor] = useState<string>();
-  /** Tracked changes are included unless excluded; unversioned files only when included. */
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const excludedFiles = useSession(session, (s) => s.excludedFiles);
+  const excludedChunks = useSession(session, (s) => s.excludedChunks);
+  /** Unversioned files are left out of commits unless included. */
   const [includedUnversioned, setIncludedUnversioned] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
   const [amend, setAmend] = useState(false);
@@ -98,18 +102,21 @@ export function CommitPanel({ session }: { session: Session }) {
   }
   const allFiles = [...lists.flatMap((l) => l.groups), ...unversionedGroups].flatMap((g) => g.files);
 
-  const isIncluded = (node: FileNode) =>
-    node.section === "changes" ? !excluded.has(node.key) : includedUnversioned.has(node.key);
-  const included = allFiles.filter(isIncluded);
+  const inclusionOf = (node: FileNode): Inclusion => {
+    if (node.section === "unversioned") return includedUnversioned.has(node.key) ? "all" : "none";
+    const key = fileKey(node.repo.path, node.file.path);
+    return excludedFiles.has(key) ? "none" : excludedChunks[key] ? "some" : "all";
+  };
+  const included = allFiles.filter((n) => inclusionOf(n) !== "none");
 
   function setIncluded(nodes: FileNode[], value: boolean) {
-    const update = (set: Set<string>, section: Section, add: boolean) => {
+    const tracked = nodes.filter((n) => n.section === "changes");
+    session.setFilesIncluded(tracked.map((n) => ({ repo: n.repo.path, path: n.file.path })), value);
+    setIncludedUnversioned((set) => {
       const next = new Set(set);
-      for (const node of nodes) if (node.section === section) add ? next.add(node.key) : next.delete(node.key);
+      for (const node of nodes) if (node.section === "unversioned") value ? next.add(node.key) : next.delete(node.key);
       return next;
-    };
-    setExcluded((set) => update(set, "changes", !value));
-    setIncludedUnversioned((set) => update(set, "unversioned", value));
+    });
   }
 
   // Visible rows, in order. With only the default changelist, it shows only when it has files.
@@ -274,7 +281,7 @@ export function CommitPanel({ session }: { session: Session }) {
     } else if ((e.key === "ArrowRight" && row?.open === false) || (e.key === "ArrowLeft" && row?.open)) {
       toggle(row.key);
     } else if (e.key === " " && selectedFiles.length) {
-      setIncluded(selectedFiles, !selectedFiles.every(isIncluded));
+      setIncluded(selectedFiles, !selectedFiles.every((n) => inclusionOf(n) === "all"));
     } else if (e.key === "Enter" || (ctrl && !e.altKey && key === "d")) {
       showDiff(selectedFiles);
     } else if (ctrl && e.altKey && key === "z" && tracked.length) {
@@ -326,14 +333,41 @@ export function CommitPanel({ session }: { session: Session }) {
           ? "Committing..."
           : undefined;
 
+  /**
+   * What to commit of a repo's included files: paths to commit whole, and content for files with some
+   * chunks excluded. Files whose chunks are all excluded are left out; `count` is the files committed.
+   */
+  async function commitParts(repo: string, nodes: FileNode[]) {
+    const paths: string[] = [];
+    const contents: CommitContent[] = [];
+    let count = 0;
+    for (const node of nodes) {
+      const excluded = node.section === "changes" ? excludedChunks[fileKey(repo, node.file.path)] : undefined;
+      const texts = excluded && (await readTexts(repo, node.file));
+      const kept = texts ? pruneChunks(excluded, keyedChunks(toDoc(texts.head), toDoc(texts.work)).map((c) => c.key)) : [];
+      if (kept === "all") continue;
+      count++;
+      if (!texts || kept.length === 0) {
+        paths.push(...withOrigPaths([node]));
+        continue;
+      }
+      contents.push({ path: node.file.path, text: partialText(texts.head, texts.work, new Set(kept)) });
+      if (node.file.orig_path) paths.push(node.file.orig_path);
+    }
+    return { paths, contents, count };
+  }
+
   async function commit(andPush = false) {
     if (commitBlocker) return;
     setBusy(true);
     let count = 0;
     try {
       await run(included, async (repo, group) => {
-        await call("commit", { repo, paths: withOrigPaths(group), message, amend });
-        count += group.length;
+        const parts = await commitParts(repo, group);
+        if (parts.count === 0) return;
+        const contents = parts.contents.length ? parts.contents : undefined;
+        await call("commit", { repo, paths: parts.paths, contents, message, amend });
+        count += parts.count;
       });
       rememberMessage(message);
       setMessage("");
@@ -366,7 +400,7 @@ export function CommitPanel({ session }: { session: Session }) {
           </div>
         ))}
         {rows.map((row) => {
-          const state = inclusion(row.files, isIncluded);
+          const state = inclusion(row.files, inclusionOf);
           return (
             <div
               key={row.key}
@@ -681,9 +715,9 @@ function withOrigPaths(nodes: FileNode[]): string[] {
   return nodes.flatMap((n) => (n.file.orig_path ? [n.file.path, n.file.orig_path] : [n.file.path]));
 }
 
-function inclusion(files: FileNode[], isIncluded: (n: FileNode) => boolean): "all" | "some" | "none" {
-  const count = files.filter(isIncluded).length;
-  return count === 0 ? "none" : count === files.length ? "all" : "some";
+function inclusion(files: FileNode[], inclusionOf: (n: FileNode) => Inclusion): Inclusion {
+  const states = new Set(files.map(inclusionOf));
+  return states.size === 1 ? [...states][0] : states.size === 0 ? "none" : "some";
 }
 
 function uniqueFiles(nodes: FileNode[]): FileNode[] {

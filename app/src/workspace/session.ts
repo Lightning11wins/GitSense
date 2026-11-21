@@ -5,6 +5,7 @@ import type { Changelists, FileChange, GitCommandLog, Repo, RepoStatus } from ".
 import type { DiffTab } from "./DiffView";
 import type { MergeTab } from "../merge/MergeTool";
 import type { CompareTab } from "../log/CompareView";
+import { keyedChunks, pruneChunks, toDoc, toggleChunk } from "./partial";
 
 /** The push tab. `branch` limits it to one branch of one repo; otherwise it lists every repo's current branch. */
 export type PushTab = { kind: "push"; id: "push"; branch?: { repo: string; name: string }; version: number };
@@ -30,6 +31,13 @@ export type SessionState = {
   activeTab?: string;
   /** Increments to ask the commit panel to focus its message box. */
   commitFocusRequests: number;
+  /** Tracked changes left out of the next commit, by `fileKey`. Other tracked changes are included. */
+  excludedFiles: ReadonlySet<string>;
+  /**
+   * Keys of chunks left out of the next commit, by `fileKey`, for included files. Lists are never empty
+   * and never hold every chunk of their file.
+   */
+  excludedChunks: Readonly<Record<string, readonly string[]>>;
 };
 
 export type Task = { id: number; label: string };
@@ -53,7 +61,7 @@ export class Session {
     info: ConnectedInfo,
     private reconnect: () => Promise<ConnectedInfo>,
   ) {
-    this.state = { info, repos: [], reposLoading: true, statuses: {}, console: [], notices: [], tasks: [], tabs: [], commitFocusRequests: 0 };
+    this.state = { info, repos: [], reposLoading: true, statuses: {}, console: [], notices: [], tasks: [], tabs: [], commitFocusRequests: 0, excludedFiles: new Set(), excludedChunks: {} };
   }
 
   start() {
@@ -145,6 +153,7 @@ export class Session {
       const status = await call("status", { repo });
       const changelists = await this.assignNewChanges(repo, status, await call("changelists.get", { repo }));
       this.patchStatus(repo, { status, changelists, error: undefined, loading: false });
+      await this.pruneExcludedChunks(repo, status);
     } catch (e) {
       this.patchStatus(repo, { error: String(e), loading: false });
     }
@@ -248,6 +257,56 @@ export class Session {
       if (!lists.lists.some((l) => l.name === name)) await call("changelists.create", { repo, name });
       return call("changelists.move_paths", { repo, name, paths: byRepo.get(repo)! });
     });
+  }
+
+  /** Includes or excludes whole files in the next commit, clearing their chunk choices. */
+  setFilesIncluded(files: { repo: string; path: string }[], included: boolean) {
+    const excludedFiles = new Set(this.state.excludedFiles);
+    const excludedChunks = { ...this.state.excludedChunks };
+    for (const { repo, path } of files) {
+      const key = fileKey(repo, path);
+      if (included) excludedFiles.delete(key);
+      else excludedFiles.add(key);
+      delete excludedChunks[key];
+    }
+    this.set({ excludedFiles, excludedChunks });
+  }
+
+  /**
+   * Includes or excludes one chunk of a file in the next commit. `keys` are the keys of all the file's
+   * current chunks. Excluding the last included chunk excludes the file; including a chunk of an excluded
+   * file includes only that chunk.
+   */
+  setChunkIncluded(repo: string, path: string, keys: readonly string[], key: string, included: boolean) {
+    const file = fileKey(repo, path);
+    const old = this.state.excludedFiles.has(file) ? "all" : (this.state.excludedChunks[file] ?? []);
+    this.setExcludedChunks(file, toggleChunk(old, keys, key, included));
+  }
+
+  private setExcludedChunks(file: string, excluded: string[] | "all") {
+    const excludedFiles = new Set(this.state.excludedFiles);
+    const excludedChunks: Record<string, readonly string[]> = { ...this.state.excludedChunks };
+    delete excludedChunks[file];
+    if (excluded === "all") excludedFiles.add(file);
+    else excludedFiles.delete(file);
+    if (excluded !== "all" && excluded.length) excludedChunks[file] = excluded;
+    this.set({ excludedFiles, excludedChunks });
+  }
+
+  /** Drops excluded chunks of a repo's files that no longer exist, excluding files left with none included. */
+  private async pruneExcludedChunks(repo: string, status: RepoStatus) {
+    for (const file of Object.keys(this.state.excludedChunks)) {
+      if (!file.startsWith(fileKey(repo, ""))) continue;
+      const change = status.changes.find((c) => fileKey(repo, c.path) === file);
+      try {
+        const texts = change && (await readTexts(repo, change));
+        const keys = texts ? keyedChunks(toDoc(texts.head), toDoc(texts.work)).map((c) => c.key) : [];
+        const excluded = this.state.excludedChunks[file];
+        if (excluded) this.setExcludedChunks(file, pruneChunks(excluded, keys));
+      } catch {
+        // Kept as they are until a later refresh can read the file.
+      }
+    }
   }
 
   private patchStatus(repo: string, patch: Partial<StatusEntry>) {
@@ -401,6 +460,24 @@ export class Session {
   dismissNotice(index: number) {
     this.set({ notices: this.state.notices.filter((_, i) => i !== index) });
   }
+}
+
+/** Key of a file in a repo, for per-file state. */
+export function fileKey(repo: string, path: string): string {
+  return `${repo}\0${path}`;
+}
+
+/**
+ * A change's HEAD and working-tree text, for splitting it into chunks. Undefined for a deleted or binary
+ * file, which can only be committed whole.
+ */
+export async function readTexts(repo: string, change: FileChange): Promise<{ head: string; work: string } | undefined> {
+  const [head, work] = await Promise.all([
+    call("file.read", { repo, path: change.orig_path ?? change.path, version: { kind: "revision", rev: "HEAD" } }),
+    call("file.read", { repo, path: change.path, version: { kind: "working_tree" } }),
+  ]);
+  if (head.binary || work.binary || !work.exists) return undefined;
+  return { head: head.text ?? "", work: work.text ?? "" };
 }
 
 /** Subscribes to part of the session state. `select` must return stored values, not new objects. */

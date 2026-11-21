@@ -8,7 +8,9 @@ import { LanguageDescription } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import type { FileContent } from "../protocol.gen";
 import { call } from "../api";
-import { useSession, type Session } from "./session";
+import { fileKey, useSession, type Session } from "./session";
+import { chunkGutter, setChunkInclusion } from "./chunkGutter";
+import { DIFF_CONFIG } from "./partial";
 import { editorTheme, mergeTheme } from "./editorTheme";
 import "./DiffView.css";
 
@@ -27,7 +29,10 @@ type Loaded = { left: FileContent; right: FileContent };
 const fromDisk = Annotation.define<boolean>();
 const SAVE_DELAY_MS = 300;
 
-/** Side-by-side diff of two file versions. A working-tree right side is editable and saved back. */
+/**
+ * Side-by-side diff of two file versions. A working-tree right side is editable and saved back, and a
+ * tracked change's chunks have checkboxes choosing what the next commit includes.
+ */
 export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
   const status = useSession(session, (s) => s.statuses[tab.repo]?.status);
   const [loaded, setLoaded] = useState<Loaded>();
@@ -66,6 +71,11 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
 
   const editable = working && !!loaded?.right.exists && !loaded.right.binary;
   const showText = !!loaded && !loaded.left.binary && !loaded.right.binary;
+  const kind = status?.changes.find((c) => c.path === right.path)?.kind;
+  const partial = editable && (kind === "modified" || kind === "added" || kind === "renamed");
+  const file = fileKey(tab.repo, right.path);
+  const fileExcluded = useSession(session, (s) => s.excludedFiles.has(file));
+  const excludedChunks = useSession(session, (s) => s.excludedChunks[file]);
 
   // Build the editors once per tab and editability; later loads update their text in place.
   useEffect(() => {
@@ -94,6 +104,9 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
         extensions: [
           ...base(workText),
           editable ? [history(), highlightActiveLine(), keymap.of([...defaultKeymap, ...historyKeymap])] : [],
+          partial
+            ? chunkGutter((keys, key, included) => session.setChunkIncluded(tab.repo, right.path, keys, key, included))
+            : [],
           EditorState.readOnly.of(!editable),
           EditorView.editable.of(editable),
           EditorView.updateListener.of((update) => {
@@ -108,6 +121,7 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       revertControls: editable ? "a-to-b" : undefined,
       renderRevertControl: revertButton,
       gutter: true,
+      diffConfig: DIFF_CONFIG,
       collapseUnchanged: { margin: 4, minSize: 8 },
     });
     merge.current = view;
@@ -127,7 +141,11 @@ export function DiffView({ session, tab }: { session: Session; tab: DiffTab }) {
       merge.current = null;
     };
     // Text changes are applied by the effect below, without rebuilding the editors.
-  }, [showText, editable, tab.repo, right.path]);
+  }, [showText, editable, partial, tab.repo, right.path]);
+
+  useEffect(() => {
+    merge.current?.b.dispatch({ effects: setChunkInclusion.of({ fileExcluded, excluded: new Set(excludedChunks) }) });
+  }, [fileExcluded, excludedChunks, showText, editable, partial, tab.repo, right.path]);
 
   useEffect(() => {
     const view = merge.current;

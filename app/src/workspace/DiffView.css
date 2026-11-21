@@ -71,3 +71,16 @@
   color: var(--text);
 }
 
+
+.diff-host .cm-include-gutter .cm-gutterElement {
+  display: flex;
+  align-items: center;
+  padding: 0 2px 0 4px;
+}
+
+.diff-host .cm-include-gutter input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+}
