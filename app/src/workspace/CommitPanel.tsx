@@ -37,6 +37,7 @@ type Dialog =
   | { kind: "delete"; nodes: FileNode[] }
   | { kind: "newList" }
   | { kind: "moveToList"; nodes: FileNode[] }
+  | { kind: "shelve"; nodes: FileNode[]; message: string }
   | { kind: "renameList"; name: string }
   | { kind: "deleteList"; name: string; count: number };
 
@@ -248,6 +249,14 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
     run(nodes, (repo, group) => call("rollback", { repo, paths: withOrigPaths(group), delete_added: deleteAdded }));
   const deleteFiles = (nodes: FileNode[]) =>
     run(nodes, (repo, group) => call("files.delete", { repo, paths: group.map((n) => n.file.path) }));
+  const shelve = (nodes: FileNode[], message: string) =>
+    run(nodes, async (repo, group) => {
+      try {
+        await call("shelf.create", { repo, message, paths: withOrigPaths(group) });
+      } finally {
+        session.refreshShelf(repo);
+      }
+    });
 
   async function openMenu(e: React.MouseEvent, key: string) {
     e.preventDefault();
@@ -498,6 +507,11 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
           lists={lists}
           onNewList={() => setDialog({ kind: "newList" })}
           onMoveToList={() => setDialog({ kind: "moveToList", nodes: menu.nodes.filter((n) => n.section === "changes") })}
+          onShelve={() => {
+            const nodes = menu.nodes.filter((n) => n.section === "changes");
+            const names = new Set(nodes.map((n) => n.list));
+            setDialog({ kind: "shelve", nodes, message: names.size === 1 ? (nodes[0].list ?? "") : "" });
+          }}
           onSetActiveList={(name) => reportErrors(session.setActiveChangelist(name))}
           onRenameList={(name) => setDialog({ kind: "renameList", name })}
           onDeleteList={(name) => {
@@ -582,6 +596,18 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
           onClose={() => setDialog(undefined)}
         />
       )}
+      {dialog?.kind === "shelve" && (
+        <InputDialog
+          title="Shelve Changes"
+          label="Message"
+          initial={dialog.message}
+          confirmLabel="Shelve"
+          onConfirm={(message) => shelve(dialog.nodes, message)}
+          onClose={() => setDialog(undefined)}
+        >
+          <FileList nodes={dialog.nodes} home={home} />
+        </InputDialog>
+      )}
       {dialog?.kind === "renameList" && (
         <InputDialog
           title="Rename Changelist"
@@ -634,6 +660,7 @@ type MenuProps = {
   lists: ListGroup[];
   onNewList: () => void;
   onMoveToList: () => void;
+  onShelve: () => void;
   onSetActiveList: (name: string) => void;
   onRenameList: (name: string) => void;
   onDeleteList: (name: string) => void;
@@ -668,6 +695,7 @@ function ChangesMenu(props: MenuProps) {
         {item("Show Diff", "Ctrl+D", menu.nodes.length > 0, onShowDiff)}
         {item("Rollback...", "Ctrl+Alt+Z", tracked, onRollback, "Select changed files to roll back")}
         {item("Move to Another Changelist...", "Alt+Shift+M", tracked, props.onMoveToList, "Select changed files to move")}
+        {item("Shelve Changes...", "", tracked, props.onShelve, "Select changed files to shelve")}
         <div className="popup-separator" />
         {item("New Changelist...", "", true, props.onNewList)}
         {item(
