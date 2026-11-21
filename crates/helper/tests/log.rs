@@ -125,10 +125,14 @@ async fn lists_files_between_revisions_or_from_the_empty_tree() {
     commit(&machine, &repo, "b.txt", "Add b.", "Ann");
 
     let session = machine.connect_local().await;
-    let files = |from: Option<&str>, to: &str| {
-        session.conn.call::<DiffFiles>(DiffFilesParams { repo: s(&repo), from: from.map(String::from), to: to.into() })
+    let files = |from: Option<&str>, to: Option<&str>| {
+        session.conn.call::<DiffFiles>(DiffFilesParams {
+            repo: s(&repo),
+            from: from.map(String::from),
+            to: to.map(String::from),
+        })
     };
-    let mut changes = files(Some(&first), "HEAD").await.unwrap();
+    let mut changes = files(Some(&first), Some("HEAD")).await.unwrap();
     changes.sort_by(|a, b| a.path.cmp(&b.path));
     let summary: Vec<_> = changes.iter().map(|c| (c.path.as_str(), c.orig_path.as_deref(), c.kind)).collect();
     assert_eq!(
@@ -139,7 +143,13 @@ async fn lists_files_between_revisions_or_from_the_empty_tree() {
             ("b.txt", None, ChangeKind::Added),
         ]
     );
-    let root = files(None, &first).await.unwrap();
+    let root = files(None, Some(&first)).await.unwrap();
     assert_eq!(root.len(), 1);
     assert_eq!((root[0].path.as_str(), root[0].kind), ("README.md", ChangeKind::Added));
+
+    std::fs::write(repo.join("a.txt"), "edited\n").unwrap();
+    std::fs::write(repo.join("untracked.txt"), "new\n").unwrap();
+    let working = files(Some("HEAD~1"), None).await.unwrap();
+    let summary: Vec<_> = working.iter().map(|c| (c.path.as_str(), c.kind)).collect();
+    assert_eq!(summary, [("a.txt", ChangeKind::Modified), ("b.txt", ChangeKind::Added)]);
 }

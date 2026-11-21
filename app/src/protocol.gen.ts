@@ -152,6 +152,12 @@ base: string,
  */
 head: string, };
 
+export type ComparedFiles = { 
+/**
+ * The commit `head`'s changes are listed from.
+ */
+merge_base: string, files: Array<FileChange>, };
+
 export type Conflict = { 
 /**
  * Path relative to the repo root.
@@ -182,7 +188,11 @@ export type DiffFilesParams = { repo: string,
 /**
  * None compares `to` with the empty tree.
  */
-from: string | null, to: string, };
+from: string | null, 
+/**
+ * None is the working tree.
+ */
+to: string | null, };
 
 export type Empty = Record<symbol, never>;
 
@@ -538,7 +548,7 @@ export type Methods = {
   "conflicts.list": { params: RepoParams; result: Array<Conflict> };
   "conflict.accept": { params: ConflictAcceptParams; result: Empty };
   "compare.commits": { params: CompareParams; result: Array<CommitInfo> };
-  "compare.files": { params: CompareParams; result: Array<FileChange> };
+  "compare.files": { params: CompareParams; result: ComparedFiles };
   "shelf.list": { params: RepoParams; result: Array<ShelfEntry> };
   "shelf.create": { params: ShelfCreateParams; result: ShelfEntry };
   "shelf.file": { params: ShelfFileParams; result: FileSides };

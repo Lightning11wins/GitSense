@@ -74,7 +74,9 @@ pub fn diff_files(ctx: &Ctx, params: DiffFilesParams) -> Result<Vec<FileChange>>
             .to_string(),
     };
     let out = git(ctx, repo)
-        .args(["diff", "--no-ext-diff", "-z", "--name-status", "-M", "--end-of-options", &from, &params.to, "--"])
+        .args(["diff", "--no-ext-diff", "-z", "--name-status", "-M", "--end-of-options", &from])
+        .args(params.to.as_deref())
+        .arg("--")
         .run()?;
     parse_name_status(out.stdout_str()?)
 }

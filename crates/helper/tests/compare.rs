@@ -63,7 +63,9 @@ async fn lists_head_changes_since_the_merge_base() {
         orig_path: orig.map(String::from),
         kind,
     };
-    let mut found = session.conn.call::<CompareFiles>(params(&repo, "main", "feature")).await.unwrap();
+    let compared = session.conn.call::<CompareFiles>(params(&repo, "main", "feature")).await.unwrap();
+    assert_eq!(compared.merge_base, machine.git(&repo, &["merge-base", "main", "feature"]).trim());
+    let mut found = compared.files;
     found.sort_by(|a, b| a.path.cmp(&b.path));
     // main-only.txt, added on main after the fork, is not listed.
     assert_eq!(
@@ -76,7 +78,7 @@ async fn lists_head_changes_since_the_merge_base() {
     );
 
     let swapped = session.conn.call::<CompareFiles>(params(&repo, "feature", "main")).await.unwrap();
-    assert_eq!(swapped, [change("main-only.txt", None, ChangeKind::Added)]);
+    assert_eq!(swapped.files, [change("main-only.txt", None, ChangeKind::Added)]);
 }
 
 #[tokio::test]

@@ -55,7 +55,7 @@ methods! {
     CommitFiles = "commit.files" (RevParams) -> Vec<FileChange>;
     /// Lists commits newest first, in an order where children come before their parents.
     Log = "log" (LogParams) -> Vec<LogCommit>;
-    /// Lists files that differ between two revisions.
+    /// Lists files that differ between two revisions, or between a revision and the working tree's tracked files.
     DiffFiles = "diff.files" (DiffFilesParams) -> Vec<FileChange>;
     /// Lists local and remote-tracking branches.
     BranchesList = "branches.list" (RepoParams) -> Branches;
@@ -124,7 +124,7 @@ methods! {
     /// Lists commits in `head` that are not in `base`, newest first.
     CompareCommits = "compare.commits" (CompareParams) -> Vec<CommitInfo>;
     /// Lists the files `head` changed since its merge base with `base`. Fails when they share no history.
-    CompareFiles = "compare.files" (CompareParams) -> Vec<FileChange>;
+    CompareFiles = "compare.files" (CompareParams) -> ComparedFiles;
     // Shelf, patches, blame.
     /// Lists a repo's shelf entries, newest first.
     ShelfList = "shelf.list" (RepoParams) -> Vec<crate::ShelfEntry>;
@@ -512,7 +512,8 @@ pub struct DiffFilesParams {
     pub repo: String,
     /// None compares `to` with the empty tree.
     pub from: Option<String>,
-    pub to: String,
+    /// None is the working tree.
+    pub to: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
@@ -660,4 +661,11 @@ pub struct CompareParams {
     pub base: String,
     /// Revision whose changes are listed, such as another branch.
     pub head: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct ComparedFiles {
+    /// The commit `head`'s changes are listed from.
+    pub merge_base: String,
+    pub files: Vec<FileChange>,
 }
