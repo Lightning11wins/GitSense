@@ -233,12 +233,17 @@ export class Session {
 
   /** Opens the diff of a file that commit `hash` changed, against its first parent. */
   openCommitDiff(repo: string, hash: string, change: FileChange) {
+    this.openRevDiff(repo, `${hash}^1`, hash, change);
+  }
+
+  /** Opens the diff of a file between two revisions. */
+  openRevDiff(repo: string, from: string, to: string, change: FileChange) {
     this.openTab({
       kind: "diff",
-      id: `diff:${repo}:${hash}:${change.path}`,
+      id: `diff:${repo}:${from}..${to}:${change.path}`,
       repo,
-      left: { rev: `${hash}^1`, path: change.orig_path ?? change.path },
-      right: { rev: hash, path: change.path },
+      left: { rev: from, path: change.orig_path ?? change.path },
+      right: { rev: to, path: change.path },
     });
   }
 
@@ -289,7 +294,7 @@ export function useSession<T>(session: Session, select: (state: SessionState) =>
 }
 
 /** Repo paths grouped by shared git dir, so worktrees of one repo share a group. */
-function groupByCommonDir(repos: Repo[]): string[][] {
+export function groupByCommonDir(repos: Repo[]): string[][] {
   const groups = new Map<string, string[]>();
   for (const repo of repos) groups.set(repo.common_dir, [...(groups.get(repo.common_dir) ?? []), repo.path]);
   return [...groups.values()];

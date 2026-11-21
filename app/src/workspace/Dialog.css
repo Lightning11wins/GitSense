@@ -95,7 +95,8 @@
   padding: 0 8px;
 }
 
-.dialog-body label:has(> input[type="checkbox"]) {
+.dialog-body label:has(> input[type="checkbox"]),
+.dialog-body label:has(> input[type="radio"]) {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -106,4 +107,11 @@
   height: 26px;
   padding: 0 6px;
   text-align: right;
+}
+
+.reword-message {
+  width: 480px;
+  height: 160px;
+  resize: vertical;
+  font-family: var(--font-mono);
 }

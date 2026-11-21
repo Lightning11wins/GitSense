@@ -1,0 +1,223 @@
+.log-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-toolbar {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-toolbar .spacer {
+  flex: 1;
+}
+
+.log-search {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  width: 220px;
+  padding: 0 6px;
+  border: 1px solid var(--border-input);
+  border-radius: 4px;
+  background: var(--bg-input);
+}
+
+.log-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  padding: 0;
+  background: transparent;
+}
+
+.log-filter {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border-radius: 4px;
+}
+
+.log-filter button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.log-filter button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.log-filter.set {
+  background: var(--bg-selected-inactive);
+}
+
+.log-filter.set button {
+  color: var(--text);
+}
+
+.log-filter .log-filter-clear {
+  padding: 0 4px;
+}
+
+.log-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.log-list {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+.log-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.tree:not(:focus-within) .log-row.selected {
+  background: var(--bg-selected-inactive);
+}
+
+.log-repo-marker {
+  flex: none;
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.log-graph {
+  flex: none;
+}
+
+.log-subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-author {
+  flex: none;
+  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.log-date {
+  flex: none;
+  width: 140px;
+}
+
+.log-hash {
+  flex: none;
+  width: 70px;
+  font-size: 12px;
+}
+
+.log-ref {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 16px;
+  background: #3574f033;
+  color: #8fb6ff;
+}
+
+.log-ref.remote {
+  background: #7b5cb433;
+  color: #c4a8f2;
+}
+
+.log-ref.tag {
+  background: #5a9e4b33;
+  color: #9fd48e;
+}
+
+.log-ref.head,
+.log-ref.current {
+  background: #f2c55c33;
+  color: var(--warning);
+}
+
+.log-details {
+  flex: none;
+  min-width: 0;
+  display: flex;
+}
+
+.commit-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.commit-files {
+  flex: 1;
+  min-height: 0;
+}
+
+.commit-range {
+  gap: 8px;
+  padding-left: 8px;
+}
+
+.commit-files .tree-row:not(.commit-range) {
+  padding-left: 12px;
+}
+
+.commit-message {
+  flex: none;
+  max-height: 45%;
+  overflow: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  user-select: text;
+}
+
+.commit-message-text {
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+.commit-refs {
+  margin-top: 6px;
+}
+
+.log-repo-list .popup-item {
+  cursor: pointer;
+}
+
+.log-pick-search {
+  margin-top: 8px;
+}
+
+.commit-range-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

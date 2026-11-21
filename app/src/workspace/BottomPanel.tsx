@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useSession, type Session } from "./session";
 import { repoName } from "./repos";
+import { LogView } from "../log/LogView";
 import "./BottomPanel.css";
 
 export type BottomTab = "log" | "console";
@@ -24,7 +25,7 @@ export function BottomPanel({ session, tab, onTab }: { session: Session; tab: Bo
           </button>
         )}
       </div>
-      {tab === "console" ? <Console session={session} /> : <div className="center-empty secondary">Log</div>}
+      {tab === "console" ? <Console session={session} /> : <LogView session={session} />}
     </div>
   );
 }
