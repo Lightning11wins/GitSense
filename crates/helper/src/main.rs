@@ -6,6 +6,7 @@ mod changelists;
 mod changes;
 mod commit;
 mod commit_actions;
+mod compare;
 mod conflicts;
 mod error;
 mod files;
@@ -163,6 +164,8 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::CommitUndo::NAME => call::<p::CommitUndo>(ctx, params, commit_actions::undo),
         p::ConflictsList::NAME => call::<p::ConflictsList>(ctx, params, conflicts::list),
         p::ConflictAccept::NAME => call::<p::ConflictAccept>(ctx, params, conflicts::accept),
+        p::CompareCommits::NAME => call::<p::CompareCommits>(ctx, params, compare::commits),
+        p::CompareFiles::NAME => call::<p::CompareFiles>(ctx, params, compare::files),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

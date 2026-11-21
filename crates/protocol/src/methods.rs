@@ -121,6 +121,10 @@ methods! {
     /// Resolves conflicted paths with one side's version, deleting a file that side deleted, and stages the result.
     /// Fails without changing anything when a path is not conflicted.
     ConflictAccept = "conflict.accept" (ConflictAcceptParams) -> Empty;
+    /// Lists commits in `head` that are not in `base`, newest first.
+    CompareCommits = "compare.commits" (CompareParams) -> Vec<CommitInfo>;
+    /// Lists the files `head` changed since its merge base with `base`. Fails when they share no history.
+    CompareFiles = "compare.files" (CompareParams) -> Vec<FileChange>;
 }
 
 /// Params or result with no fields.
@@ -622,4 +626,13 @@ pub struct ConflictAcceptParams {
     /// Conflicted paths relative to the repo root.
     pub paths: Vec<String>,
     pub side: ConflictSide,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct CompareParams {
+    pub repo: String,
+    /// Revision to compare against, such as the current branch.
+    pub base: String,
+    /// Revision whose changes are listed, such as another branch.
+    pub head: String,
 }

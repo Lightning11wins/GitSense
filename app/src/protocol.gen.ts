@@ -119,6 +119,16 @@ export type CommitResult = {
  */
 hash: string, };
 
+export type CompareParams = { repo: string, 
+/**
+ * Revision to compare against, such as the current branch.
+ */
+base: string, 
+/**
+ * Revision whose changes are listed, such as another branch.
+ */
+head: string, };
+
 export type Conflict = { 
 /**
  * Path relative to the repo root.
@@ -434,4 +444,6 @@ export type Methods = {
   "commit.undo": { params: RepoParams; result: Empty };
   "conflicts.list": { params: RepoParams; result: Array<Conflict> };
   "conflict.accept": { params: ConflictAcceptParams; result: Empty };
+  "compare.commits": { params: CompareParams; result: Array<CommitInfo> };
+  "compare.files": { params: CompareParams; result: Array<FileChange> };
 };
