@@ -3,6 +3,7 @@ import { GitBranch, GitCommitHorizontal, SquareTerminal } from "lucide-react";
 import { Splitter } from "./Splitter";
 import { useSession, type Session } from "./session";
 import { CommitPanel } from "./CommitPanel";
+import { ShelfPanel } from "./ShelfPanel";
 import { BottomPanel, type BottomTab } from "./BottomPanel";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
@@ -15,6 +16,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 /** The main window for a connected machine, laid out like IntelliJ's New UI. */
 export function Workspace({ session }: { session: Session }) {
   const [leftOpen, setLeftOpen] = useState(true);
+  const [leftTab, setLeftTab] = useState<"commit" | "shelf">("commit");
   const [leftWidth, setLeftWidth] = useState(360);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>("log");
   const [bottomHeight, setBottomHeight] = useState(280);
@@ -28,6 +30,7 @@ export function Workspace({ session }: { session: Session }) {
   const toggleBottom = (tab: BottomTab) => setBottomTab((current) => (current === tab ? null : tab));
   const focusCommit = () => {
     setLeftOpen(true);
+    setLeftTab("commit");
     session.requestCommitFocus();
   };
 
@@ -81,7 +84,12 @@ export function Workspace({ session }: { session: Session }) {
             {leftOpen && (
               <>
                 <div className="tool-window" style={{ width: leftWidth }}>
-                  <CommitPanel session={session} />
+                  <div className="tool-window-tab" hidden={leftTab !== "commit"}>
+                    <CommitPanel session={session} tabs={<LeftTabs tab={leftTab} onTab={setLeftTab} />} />
+                  </div>
+                  <div className="tool-window-tab" hidden={leftTab !== "shelf"}>
+                    <ShelfPanel session={session} tabs={<LeftTabs tab={leftTab} onTab={setLeftTab} />} />
+                  </div>
                 </div>
                 <Splitter direction="vertical" onResize={(d) => setLeftWidth((w) => clamp(w + d, 220, 900))} />
               </>
@@ -102,6 +110,19 @@ export function Workspace({ session }: { session: Session }) {
       </div>
       <StatusBar session={session} />
     </div>
+  );
+}
+
+function LeftTabs({ tab, onTab }: { tab: "commit" | "shelf"; onTab: (tab: "commit" | "shelf") => void }) {
+  return (
+    <>
+      <button className={`tab tool-window-title ${tab === "commit" ? "active" : ""}`} onClick={() => onTab("commit")}>
+        Commit
+      </button>
+      <button className={`tab tool-window-title ${tab === "shelf" ? "active" : ""}`} onClick={() => onTab("shelf")}>
+        Shelf
+      </button>
+    </>
   );
 }
 

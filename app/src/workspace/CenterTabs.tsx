@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useSession, type CenterTab, type Session } from "./session";
 import { DiffView } from "./DiffView";
+import { ContentDiff } from "./ContentDiff";
 import { PushView } from "./PushView";
 import { MergeTool } from "../merge/MergeTool";
 import { CompareView } from "../log/CompareView";
@@ -42,6 +43,8 @@ export function CenterTabs({ session }: { session: Session }) {
             <MergeTool session={session} tab={tab} />
           ) : tab.kind === "compare" ? (
             <CompareView session={session} tab={tab} />
+          ) : tab.kind === "content-diff" ? (
+            <ContentDiff path={tab.path} left={tab.left} right={tab.right} />
           ) : (
             <PushView session={session} tab={tab} />
           )}
@@ -55,12 +58,14 @@ function tabTitle(tab: CenterTab) {
   if (tab.kind === "diff") return `${tab.repo}/${tab.right.path}`;
   if (tab.kind === "merge") return `Merge ${tab.repo}/${tab.path}`;
   if (tab.kind === "compare") return `${tab.repo}: ${tabLabel(tab)}`;
+  if (tab.kind === "content-diff") return tab.title;
   return "Push Commits";
 }
 
 function tabLabel(tab: CenterTab) {
   if (tab.kind === "diff") return baseName(tab.right.path);
   if (tab.kind === "merge") return `Merge ${baseName(tab.path)}`;
+  if (tab.kind === "content-diff") return baseName(tab.path);
   if (tab.kind === "compare") return tab.head === null ? `${tab.base} vs Working Tree` : `${tab.head} vs ${tab.base}`;
   return "Push";
 }

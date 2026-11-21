@@ -1,18 +1,22 @@
 // State of one connected machine: repos, their statuses, and the Git Console.
 import { useSyncExternalStore } from "react";
 import { call, getSettings, onSettings, onWindowEvent, type ConnectedInfo, type Settings } from "../api";
-import type { Changelists, FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
+import type { Changelists, FileChange, GitCommandLog, Repo, RepoStatus, ShelfEntry } from "../protocol.gen";
 import type { DiffTab } from "./DiffView";
+import type { ContentDiffTab } from "./ContentDiff";
 import type { MergeTab } from "../merge/MergeTool";
 import type { CompareTab } from "../log/CompareView";
 import { keyedChunks, pruneChunks, toDoc, toggleChunk } from "./partial";
 
 /** The push tab. `branch` limits it to one branch of one repo; otherwise it lists every repo's current branch. */
 export type PushTab = { kind: "push"; id: "push"; branch?: { repo: string; name: string }; version: number };
-export type CenterTab = DiffTab | PushTab | MergeTab | CompareTab;
+export type CenterTab = DiffTab | PushTab | MergeTab | CompareTab | ContentDiffTab;
 
 /** A repo's status. `status` and `changelists` are loaded together; each tracked change is in one of the lists. */
 export type StatusEntry = { status?: RepoStatus; changelists?: Changelists; error?: string; loading: boolean };
+
+/** A repo's shelf entries, newest first. */
+export type ShelfState = { entries?: ShelfEntry[]; error?: string };
 
 export type SessionState = {
   info: ConnectedInfo;
@@ -20,6 +24,7 @@ export type SessionState = {
   reposLoading: boolean;
   reposError?: string;
   statuses: Record<string, StatusEntry>;
+  shelves: Record<string, ShelfState>;
   console: GitCommandLog[];
   notices: string[];
   /** Background tasks in progress, shown in the status bar. */
@@ -63,7 +68,7 @@ export class Session {
     info: ConnectedInfo,
     private reconnect: () => Promise<ConnectedInfo>,
   ) {
-    this.state = { info, repos: [], reposLoading: true, statuses: {}, console: [], notices: [], tasks: [], tabs: [], commitFocusRequests: 0, excludedFiles: new Set(), excludedChunks: {} };
+    this.state = { info, repos: [], reposLoading: true, statuses: {}, shelves: {}, console: [], notices: [], tasks: [], tabs: [], commitFocusRequests: 0, excludedFiles: new Set(), excludedChunks: {} };
   }
 
   start() {
@@ -162,6 +167,17 @@ export class Session {
     const again = this.refreshing.get(repo);
     this.refreshing.delete(repo);
     if (again) this.refreshStatus(repo);
+  }
+
+  /** Reloads a repo's shelf entries. */
+  async refreshShelf(repo: string) {
+    let shelf: ShelfState;
+    try {
+      shelf = { entries: await call("shelf.list", { repo }) };
+    } catch (e) {
+      shelf = { error: String(e) };
+    }
+    this.set({ shelves: { ...this.state.shelves, [repo]: shelf } });
   }
 
   /**
@@ -410,6 +426,19 @@ export class Session {
       repo,
       left: { rev: from, path: change.orig_path ?? change.path },
       right: { rev: to, path: change.path },
+    });
+  }
+
+  /** Opens a shelved file's diff against the commit it was shelved on. */
+  async openShelvedDiff(repo: string, entry: ShelfEntry, file: FileChange) {
+    const sides = await call("shelf.file", { repo, id: entry.id, path: file.path });
+    this.openTab({
+      kind: "content-diff",
+      id: `shelf:${repo}:${entry.id}:${file.path}`,
+      path: file.path,
+      title: `${repo}/${file.path}, shelved: ${entry.message}`,
+      left: { label: `${entry.base.slice(0, 8)}: ${file.orig_path ?? file.path}`, content: sides.before },
+      right: { label: "Shelved version", content: sides.after },
     });
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, FileText, FolderGit2, History, RefreshCw } from "lucide-react";
 import type { Changelists, CommitContent, FileChange, IgnoreFile, Repo, RepoStatus } from "../protocol.gen";
 import { call } from "../api";
@@ -40,8 +40,11 @@ type Dialog =
   | { kind: "renameList"; name: string }
   | { kind: "deleteList"; name: string; count: number };
 
-/** The Commit tool window: changes grouped by changelist and repo, inclusion checkboxes, and the commit message. */
-export function CommitPanel({ session }: { session: Session }) {
+/**
+ * The Commit tab: changes grouped by changelist and repo, inclusion checkboxes, and the commit message. `tabs`
+ * switches the tool window's tab.
+ */
+export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNode }) {
   const repos = useSession(session, (s) => s.repos);
   const statuses = useSession(session, (s) => s.statuses);
   const home = useSession(session, (s) => s.info.home);
@@ -386,7 +389,7 @@ export function CommitPanel({ session }: { session: Session }) {
   return (
     <div className="commit-panel">
       <div className="tool-window-header">
-        <span className="tool-window-title">Commit</span>
+        {tabs}
         <span className="spacer" />
         <button className="icon-button" title="Refresh" onClick={session.refreshAll}>
           <RefreshCw size={16} />
