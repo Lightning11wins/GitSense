@@ -317,6 +317,12 @@ export type RevsParams = { repo: string,
  */
 revs: Array<string>, };
 
+export type RewordParams = { repo: string, rev: string, 
+/**
+ * The commit's new full message. Must not be empty.
+ */
+message: string, };
+
 export type RollbackParams = { repo: string, 
 /**
  * Tracked files, relative to the repo root. Renames need both paths.
@@ -398,4 +404,5 @@ export type Methods = {
   "cherry_pick": { params: RevsParams; result: Empty };
   "revert": { params: RevsParams; result: Empty };
   "reset": { params: ResetParams; result: Empty };
+  "commit.reword": { params: RewordParams; result: Empty };
 };

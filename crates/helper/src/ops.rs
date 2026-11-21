@@ -17,6 +17,18 @@ pub fn in_progress(repo: &Path) -> Result<Option<Operation>> {
     Ok(operation(&dirs.git_dir))
 }
 
+/// Fails when an operation is in progress, for actions that must start from a settled repo.
+pub fn require_settled(repo: &Path, action: &str) -> Result<()> {
+    match in_progress(repo)? {
+        None => Ok(()),
+        Some(op) => Err(Error::new(format!(
+            "Failed to {action} in '{}': a {} is in progress.",
+            repo.display(),
+            operation_name(op)
+        ))),
+    }
+}
+
 fn operation_name(op: Operation) -> &'static str {
     match op {
         Operation::Merge => "merge",

@@ -5,6 +5,7 @@ mod branches;
 mod changelists;
 mod changes;
 mod commit;
+mod commit_actions;
 mod error;
 mod files;
 mod git;
@@ -157,6 +158,7 @@ fn dispatch(ctx: &Ctx, request: Request) -> Result<Value> {
         p::CherryPick::NAME => call::<p::CherryPick>(ctx, params, ops::cherry_pick),
         p::Revert::NAME => call::<p::Revert>(ctx, params, ops::revert),
         p::Reset::NAME => call::<p::Reset>(ctx, params, ops::reset),
+        p::CommitReword::NAME => call::<p::CommitReword>(ctx, params, commit_actions::reword),
         other => Err(Error::new(format!("Failed to find method '{other}'."))),
     }
 }

@@ -110,6 +110,9 @@ methods! {
     /// Moves the current branch to a revision. `soft` keeps the index and working tree, `mixed` resets the index,
     /// `hard` resets both, and `keep` resets both but fails if that would lose local changes.
     Reset = "reset" (ResetParams) -> Empty;
+    /// Changes a commit's message and nothing else: the working tree and index stay as they are. `rev` must be
+    /// HEAD or an ancestor of HEAD with no merge commits between them, and no operation may be in progress.
+    CommitReword = "commit.reword" (RewordParams) -> Empty;
 }
 
 /// Params or result with no fields.
@@ -574,4 +577,12 @@ pub enum ResetMode {
     Mixed,
     Hard,
     Keep,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+pub struct RewordParams {
+    pub repo: String,
+    pub rev: String,
+    /// The commit's new full message. Must not be empty.
+    pub message: String,
 }
