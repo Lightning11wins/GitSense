@@ -221,3 +221,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.compare-list {
+  overflow: auto;
+}
+
+.compare-row {
+  gap: 6px;
+  padding-left: 8px;
+}

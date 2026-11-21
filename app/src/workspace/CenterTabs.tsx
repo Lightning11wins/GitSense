@@ -3,6 +3,7 @@ import { useSession, type CenterTab, type Session } from "./session";
 import { DiffView } from "./DiffView";
 import { PushView } from "./PushView";
 import { MergeTool } from "../merge/MergeTool";
+import { CompareView } from "../log/CompareView";
 import { baseName } from "./repos";
 import "./CenterTabs.css";
 
@@ -21,7 +22,7 @@ export function CenterTabs({ session }: { session: Session }) {
             title={tabTitle(tab)}
             onMouseDown={(e) => (e.button === 1 ? session.closeTab(tab.id) : session.activateTab(tab.id))}
           >
-            <span>{tab.kind === "diff" ? baseName(tab.right.path) : tab.kind === "merge" ? `Merge ${baseName(tab.path)}` : "Push"}</span>
+            <span>{tabLabel(tab)}</span>
             <button
               className="center-tab-close"
               title="Close"
@@ -39,6 +40,8 @@ export function CenterTabs({ session }: { session: Session }) {
             <DiffView session={session} tab={tab} />
           ) : tab.kind === "merge" ? (
             <MergeTool session={session} tab={tab} />
+          ) : tab.kind === "compare" ? (
+            <CompareView session={session} tab={tab} />
           ) : (
             <PushView session={session} tab={tab} />
           )}
@@ -51,5 +54,13 @@ export function CenterTabs({ session }: { session: Session }) {
 function tabTitle(tab: CenterTab) {
   if (tab.kind === "diff") return `${tab.repo}/${tab.right.path}`;
   if (tab.kind === "merge") return `Merge ${tab.repo}/${tab.path}`;
+  if (tab.kind === "compare") return `${tab.repo}: ${tabLabel(tab)}`;
   return "Push Commits";
+}
+
+function tabLabel(tab: CenterTab) {
+  if (tab.kind === "diff") return baseName(tab.right.path);
+  if (tab.kind === "merge") return `Merge ${baseName(tab.path)}`;
+  if (tab.kind === "compare") return tab.head === null ? `${tab.base} vs Working Tree` : `${tab.head} vs ${tab.base}`;
+  return "Push";
 }

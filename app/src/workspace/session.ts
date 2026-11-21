@@ -4,10 +4,11 @@ import { call, getSettings, onSettings, onWindowEvent, type ConnectedInfo, type 
 import type { FileChange, GitCommandLog, Repo, RepoStatus } from "../protocol.gen";
 import type { DiffTab } from "./DiffView";
 import type { MergeTab } from "../merge/MergeTool";
+import type { CompareTab } from "../log/CompareView";
 
 /** The push tab. `branch` limits it to one branch of one repo; otherwise it lists every repo's current branch. */
 export type PushTab = { kind: "push"; id: "push"; branch?: { repo: string; name: string }; version: number };
-export type CenterTab = DiffTab | PushTab | MergeTab;
+export type CenterTab = DiffTab | PushTab | MergeTab | CompareTab;
 
 export type StatusEntry = { status?: RepoStatus; error?: string; loading: boolean };
 
@@ -221,14 +222,17 @@ export class Session {
     await this.loadRepos("repos.list");
   }
 
-  /** Opens a working-tree file's diff against HEAD in a center tab, or the merge tool for a conflicted file. */
-  openDiff(repo: string, change: FileChange) {
+  /**
+   * Opens a working-tree file's diff against a revision in a center tab, reusing its tab if open, or the merge tool
+   * for a conflicted file.
+   */
+  openDiff(repo: string, change: FileChange, rev = "HEAD") {
     if (change.kind === "conflicted") return this.openMerge(repo, change.path);
     this.openTab({
       kind: "diff",
-      id: `diff:${repo}:${change.path}`,
+      id: rev === "HEAD" ? `diff:${repo}:${change.path}` : `diff:${repo}:${rev}:${change.path}`,
       repo,
-      left: { rev: "HEAD", path: change.orig_path ?? change.path },
+      left: { rev, path: change.orig_path ?? change.path },
       right: { path: change.path },
     });
   }
@@ -247,6 +251,11 @@ export class Session {
       left: { rev: from, path: change.orig_path ?? change.path },
       right: { rev: to, path: change.path },
     });
+  }
+
+  /** Opens a comparison of two branches, or of a branch with the working tree when `head` is null. */
+  openCompare(repo: string, base: string, head: string | null) {
+    this.openTab({ kind: "compare", id: `compare:${repo}:${base}:${head ?? ""}`, repo, base, head });
   }
 
   /** Opens the merge tool for a conflicted file. */

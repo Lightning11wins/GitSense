@@ -128,6 +128,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
             ),
         },
         { label: `New Branch from '${full}'...`, run: () => setDialog({ kind: "new", start: full, name: b.name, checkout: true }) },
+        ...compareActions(full, undefined),
         "separator",
         {
           label: `Rebase '${current ?? "HEAD"}' onto '${full}'`,
@@ -158,6 +159,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
         disabled: isCurrent ?? noCurrent ?? elsewhere,
         run: () => run(`Rebasing ${b.name}...`, () => call("rebase", { repo, onto: current!, branch: b.name })),
       },
+      ...compareActions(b.name, isCurrent),
       "separator",
       {
         label: `Rebase '${current ?? "HEAD"}' onto '${b.name}'`,
@@ -182,6 +184,18 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
       "separator",
       { label: "Rename...", run: () => setDialog({ kind: "rename", from: b.name }) },
       { label: "Delete", disabled: isCurrent ?? elsewhere, run: () => deleteLocal(b.name) },
+    ];
+  }
+
+  function compareActions(branch: string, isCurrent: string | undefined): MenuAction[] {
+    return [
+      "separator",
+      {
+        label: `Compare with '${current ?? "HEAD"}'`,
+        disabled: isCurrent,
+        run: () => (onClose(), session.openCompare(repo, current ?? "HEAD", branch)),
+      },
+      { label: "Show Diff with Working Tree", run: () => (onClose(), session.openCompare(repo, branch, null)) },
     ];
   }
 
