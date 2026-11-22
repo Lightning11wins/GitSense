@@ -48,4 +48,6 @@ cargo test              # helper and protocol tests
 cargo test -p gitsense  # app core tests
 ```
 
+`scripts/deploy.sh` builds the `.deb` and installs it, asking for an admin password. To deploy automatically whenever you pull or switch branches in a checkout, run `scripts/auto-deploy.sh on` there (`off` to stop, `status` to check). Deploys run in the background, log to `target/auto-deploy.log`, and take effect when GitSense restarts.
+
 [DESIGN.md](DESIGN.md) covers the architecture and planned features.
