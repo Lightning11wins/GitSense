@@ -7,6 +7,7 @@ Steps:
   click X Y       left-click
   dclick X Y      left double-click
   rclick X Y      right-click
+  drag X Y X2 Y2  left-drag from X Y to X2 Y2
   type TEXT       type text
   key NAME        press a key combo by X keysym names, like ctrl+Return or F7
   sleep SECONDS   wait
@@ -85,6 +86,20 @@ def click(x, y, button=1, count=1):
         time.sleep(0.05)
 
 
+def drag(x, y, x2, y2):
+    xtst.XTestFakeMotionEvent(dpy, -1, x, y, 0)
+    xtst.XTestFakeButtonEvent(dpy, 1, True, 0)
+    x11.XFlush(dpy)
+    time.sleep(0.05)
+    for i in range(1, 11):
+        xtst.XTestFakeMotionEvent(dpy, -1, x + (x2 - x) * i // 10, y + (y2 - y) * i // 10, 0)
+        x11.XFlush(dpy)
+        time.sleep(0.02)
+    xtst.XTestFakeButtonEvent(dpy, 1, False, 0)
+    x11.XFlush(dpy)
+    time.sleep(0.05)
+
+
 args = sys.argv[1:]
 while args:
     step, args = args[0], args[1:]
@@ -95,6 +110,9 @@ while args:
             x11.XFlush(dpy)
         else:
             click(x, y, 3 if step == "rclick" else 1, 2 if step == "dclick" else 1)
+    elif step == "drag":
+        drag(*map(int, args[:4]))
+        args = args[4:]
     elif step == "type":
         type_text(args[0])
         args = args[1:]
