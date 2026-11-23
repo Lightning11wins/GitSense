@@ -227,10 +227,6 @@
   cursor: pointer;
 }
 
-.log-pick-search {
-  margin-top: 8px;
-}
-
 .commit-range-label {
   overflow: hidden;
   text-overflow: ellipsis;

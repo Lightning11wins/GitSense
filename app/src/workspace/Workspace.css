@@ -310,9 +310,15 @@
 }
 
 .popup-search {
+  flex: none;
   margin: 0 8px 6px;
   height: 28px;
   padding: 0 8px;
+}
+
+/* With no title above it, the search needs a gap at the popup's top edge. */
+.popup-search:first-child {
+  margin-top: 8px;
 }
 
 .popup-item.active:not(:disabled) {

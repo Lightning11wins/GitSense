@@ -666,7 +666,7 @@ function PickList(props: {
   return (
     <Popup at={props.at} onClose={props.onClose}>
       <input
-        className="popup-search log-pick-search"
+        className="popup-search"
         autoFocus
         placeholder={props.placeholder}
         value={text}
