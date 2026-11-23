@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, RefreshCw, Server } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, RefreshCw, Server, Square, SquareCheck } from "lucide-react";
 import { newWindow } from "../api";
 import { below, Popup } from "./Popup";
 import { RepoManager } from "./RepoManager";
@@ -82,6 +82,12 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
           <div className="popup-title row">
             Repositories
             <span className="grow" />
+            <button className="icon-button" title="Select All" disabled={repos.every((r) => !r.hidden)} onClick={() => setAllHidden(false)}>
+              <SquareCheck size={14} />
+            </button>
+            <button className="icon-button" title="Deselect All" disabled={repos.every((r) => r.hidden)} onClick={() => setAllHidden(true)}>
+              <Square size={14} />
+            </button>
             <button className="icon-button" title="Fetch All" onClick={() => (close(), session.fetchAll())}>
               <RefreshCw size={14} />
             </button>
@@ -110,13 +116,6 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
                 </div>
               );
             })}
-            <div className="popup-separator" />
-            <button className="popup-item" disabled={repos.every((r) => !r.hidden)} onClick={() => setAllHidden(false)}>
-              Select All
-            </button>
-            <button className="popup-item" disabled={repos.every((r) => r.hidden)} onClick={() => setAllHidden(true)}>
-              Deselect All
-            </button>
           </div>
         </Popup>
       )}
