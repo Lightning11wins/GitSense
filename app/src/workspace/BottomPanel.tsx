@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowDownToLine, Trash2, WrapText } from "lucide-react";
+import { ArrowDownToLine, Clock, Trash2, WrapText } from "lucide-react";
 import { useSession, type ConsoleEntry, type Session } from "./session";
 import { repoName } from "./repos";
 import { LogView } from "../log/LogView";
@@ -10,6 +10,7 @@ export type BottomTab = "log" | "console";
 /** The bottom Git tool window, with Log and Console tabs. */
 export function BottomPanel({ session, tab, onTab }: { session: Session; tab: BottomTab; onTab: (tab: BottomTab) => void }) {
   const [softWrap, setSoftWrap] = useState(true);
+  const [showTimes, setShowTimes] = useState(true);
   return (
     <div className="bottom-panel">
       <div className="tool-window-header">
@@ -21,12 +22,24 @@ export function BottomPanel({ session, tab, onTab }: { session: Session; tab: Bo
           Console
         </button>
       </div>
-      {tab === "console" ? <Console session={session} softWrap={softWrap} onSoftWrap={setSoftWrap} /> : <LogView session={session} />}
+      {tab === "console" ? (
+        <Console session={session} softWrap={softWrap} onSoftWrap={setSoftWrap} showTimes={showTimes} onShowTimes={setShowTimes} />
+      ) : (
+        <LogView session={session} />
+      )}
     </div>
   );
 }
 
-function Console({ session, softWrap, onSoftWrap }: { session: Session; softWrap: boolean; onSoftWrap: (on: boolean) => void }) {
+type ConsoleProps = {
+  session: Session;
+  softWrap: boolean;
+  onSoftWrap: (on: boolean) => void;
+  showTimes: boolean;
+  onShowTimes: (on: boolean) => void;
+};
+
+function Console({ session, softWrap, onSoftWrap, showTimes, onShowTimes }: ConsoleProps) {
   const entries = useSession(session, (s) => s.console);
   const home = useSession(session, (s) => s.info.home);
   const repos = useSession(session, (s) => s.repos);
@@ -61,6 +74,9 @@ function Console({ session, softWrap, onSoftWrap }: { session: Session; softWrap
         <button className={`icon-button ${follow ? "active" : ""}`} title="Scroll to End" aria-pressed={follow} onClick={() => setFollow(!follow)}>
           <ArrowDownToLine size={16} />
         </button>
+        <button className={`icon-button ${showTimes ? "active" : ""}`} title="Show Timestamps" aria-pressed={showTimes} onClick={() => onShowTimes(!showTimes)}>
+          <Clock size={16} />
+        </button>
         <button className="icon-button" title="Clear" disabled={entries.length === 0} onClick={() => session.clearConsole()}>
           <Trash2 size={16} />
         </button>
@@ -69,18 +85,18 @@ function Console({ session, softWrap, onSoftWrap }: { session: Session; softWrap
         {entries.length === 0 && <div className="console-empty">Git commands that change repositories appear here.</div>}
         {entries.map((entry, i) => {
           const repo = repos.find((r) => r.path === entry.repo);
-          return <ConsoleCommand key={i} entry={entry} repoLabel={repo ? repoName(repo, home) : entry.repo} />;
+          return <ConsoleCommand key={i} entry={entry} repoLabel={repo ? repoName(repo, home) : entry.repo} showTime={showTimes} />;
         })}
       </div>
     </div>
   );
 }
 
-function ConsoleCommand({ entry, repoLabel }: { entry: ConsoleEntry; repoLabel: string }) {
+function ConsoleCommand({ entry, repoLabel, showTime }: { entry: ConsoleEntry; repoLabel: string; showTime: boolean }) {
   const failed = entry.exit_code !== 0;
   return (
     <div className="console-entry">
-      <span className="console-time">{formatTime(entry.started)}</span>
+      {showTime && <span className="console-time">{formatTime(entry.started)}</span>}
       <div className="console-body">
         <div className="console-command">
           <span className="console-repo">{repoLabel}</span>
