@@ -24,14 +24,19 @@ fn main() {
 }
 
 /// Builds the helper with its own target dir, so this nested cargo doesn't
-/// wait on the outer build's lock.
+/// wait on the outer build's lock. The helper uses the app's profile, release
+/// or dev.
 fn build_helper(workspace: &std::path::Path) -> PathBuf {
     let target_dir = workspace.join("target/helper");
+    let profile = std::env::var("PROFILE").unwrap();
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
-    let status = Command::new(cargo)
+    let mut command = Command::new(cargo);
+    command.args(["build", "-p", "gitsense-helper", "--target", HELPER_TARGET, "--target-dir"]).arg(&target_dir);
+    if profile == "release" {
+        command.arg("--release");
+    }
+    let status = command
         .current_dir(workspace)
-        .args(["build", "--release", "-p", "gitsense-helper", "--target", HELPER_TARGET, "--target-dir"])
-        .arg(&target_dir)
         .env_remove("RUSTFLAGS")
         .env_remove("CARGO_ENCODED_RUSTFLAGS")
         .status()
@@ -40,5 +45,5 @@ fn build_helper(workspace: &std::path::Path) -> PathBuf {
         status.success(),
         "Failed to build the helper for {HELPER_TARGET}; is the target installed (rustup target add {HELPER_TARGET})?"
     );
-    target_dir.join(HELPER_TARGET).join("release/gitsense-helper")
+    target_dir.join(HELPER_TARGET).join(&profile).join("gitsense-helper")
 }
