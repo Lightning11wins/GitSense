@@ -6,6 +6,7 @@ import { fileKey, readTexts, useSession, type Session } from "./session";
 import { keyedChunks, partialText, pruneChunks, toDoc } from "./partial";
 import { baseName, dirName, repoName } from "./repos";
 import { Popup } from "./Popup";
+import { Splitter } from "./Splitter";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { InputDialog } from "./InputDialog";
 import { MoveToChangelistDialog, NewChangelistDialog } from "./ChangelistDialogs";
@@ -66,6 +67,8 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
   const [historyAt, setHistoryAt] = useState<{ x: number; y: number }>();
   const [dialog, setDialog] = useState<Dialog>();
   const messageRef = useRef<HTMLTextAreaElement>(null);
+  const [messageHeight, setMessageHeight] = useState(110);
+  const treeRef = useRef<HTMLDivElement>(null);
 
   // Tree data: changelists, then repos, then files; unversioned files by repo.
   const lists: ListGroup[] = [];
@@ -409,7 +412,7 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
           <RefreshCw size={16} />
         </button>
       </div>
-      <div className="tree changes-tree" tabIndex={0} onKeyDown={onTreeKey}>
+      <div ref={treeRef} className="tree changes-tree" tabIndex={0} onKeyDown={onTreeKey}>
         {reposError && <div className="error-text tree-message">{reposError}</div>}
         {errors.map(({ repo, error }) => (
           <div key={repo.path} className="error-text tree-message">
@@ -453,6 +456,13 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
         })}
         {allFiles.length === 0 && !reposError && <div className="secondary tree-message">No changes</div>}
       </div>
+      <Splitter
+        direction="horizontal"
+        onResize={(d) =>
+          // The tree keeps its 60px minimum height.
+          setMessageHeight((h) => Math.max(40, Math.min(h + treeRef.current!.clientHeight - 60, h - d)))
+        }
+      />
       <div className="commit-message-box">
         <div className="commit-options">
           <label className="amend">
@@ -470,6 +480,7 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
         <textarea
           ref={messageRef}
           placeholder="Commit Message"
+          style={{ height: messageHeight }}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {

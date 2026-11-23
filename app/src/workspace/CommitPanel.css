@@ -24,13 +24,11 @@
   flex-direction: column;
   gap: 8px;
   padding: 8px 12px;
-  border-top: 1px solid var(--border);
 }
 
 .commit-message-box textarea {
-  height: 110px;
   padding: 8px;
-  resize: vertical;
+  resize: none;
   font-family: var(--font-ui);
 }
 
