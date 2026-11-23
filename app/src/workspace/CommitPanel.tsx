@@ -453,7 +453,7 @@ export function CommitPanel({ session, tabs }: { session: Session; tabs: ReactNo
         })}
         {allFiles.length === 0 && !reposError && <div className="secondary tree-message">No changes</div>}
       </div>
-      <div className="commit-message">
+      <div className="commit-message-box">
         <div className="commit-options">
           <label className="amend">
             <input type="checkbox" checked={amend} onChange={(e) => toggleAmend(e.target.checked)} /> Amend
