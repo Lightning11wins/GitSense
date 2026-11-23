@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
 members = ["crates/protocol", "crates/helper", "crates/client", "app/src-tauri"]
+# Plain cargo commands skip the app. Building it with the other crates changes
+# its shared dependencies' features, so it would rebuild the Tauri stack apart
+# from `pnpm dev`.
+default-members = ["crates/protocol", "crates/helper", "crates/client"]
 
 [workspace.package]
 version = "0.1.0"

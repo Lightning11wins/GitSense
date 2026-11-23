@@ -42,9 +42,10 @@ Remote machines need only `sh`, coreutils, and git 2.34 or newer. GitSense conne
 From `app/`:
 
 ```sh
-pnpm dev     # run the app with live reload
-pnpm test    # UI tests
-cargo test   # helper and protocol tests
+pnpm dev                # run the app with live reload
+pnpm test               # UI tests
+cargo test              # helper and protocol tests
+cargo test -p gitsense  # app core tests
 ```
 
 [DESIGN.md](DESIGN.md) covers the architecture and planned features.
