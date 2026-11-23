@@ -134,6 +134,7 @@ Keyboard shortcuts follow IntelliJ's default Linux keymap for every implemented 
 ### Log
 
 - Commit graph across all repos (repo color markers) or filtered to some.
+- Branches tree beside the graph (can be hidden): HEAD, then local and remote branches merged by name across repos, with the repos a branch is in when not all, and incoming/outgoing counts. Double-click filters the log to the branch; right-click opens the branches popup's actions, after picking a repo when the branch is in several.
 - Filters: branch, author, date, path/repo, and text or hash search.
 - Commit details: message, author, changed files; diff per file.
 - Select several commits to review their combined changes.

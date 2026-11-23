@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { ChevronDown, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, GitBranch, RefreshCw, Search, X } from "lucide-react";
 import type { LogCommit, LogParams } from "../protocol.gen";
 import { call } from "../api";
 import { useSession, type Session } from "../workspace/session";
@@ -10,6 +10,7 @@ import { InputDialog } from "../workspace/InputDialog";
 import { layoutGraph, type GraphRow, type Segment } from "./graph";
 import { interleave, type LogRow } from "./interleave";
 import { CommitDetails } from "./CommitDetails";
+import { BranchesPanel } from "./BranchesPanel";
 import { ResetDialog, RewordDialog } from "./CommitDialogs";
 import "./LogView.css";
 
@@ -51,8 +52,10 @@ function resizeColumns(widths: Widths, index: number, delta: number): Widths {
 /** Rows are keyed by repo and hash, since separate clones share commits. */
 const rowKey = (row: LogRow) => `${row.repo}\0${row.commit.hash}`;
 
-/** The Log tab: commits of every repo, or filtered ones, with a graph, filters, and the selection's details. */
-export function LogView({ session }: { session: Session }) {
+type Props = { session: Session; showBranches: boolean; onShowBranches: (show: boolean) => void };
+
+/** The Log tab: commits of every repo, or filtered ones, with a branches tree, a graph, filters, and the selection's details. */
+export function LogView({ session, showBranches, onShowBranches }: Props) {
   const allRepos = useSession(session, (s) => s.repos);
   const statuses = useSession(session, (s) => s.statuses);
   const home = useSession(session, (s) => s.info.home);
@@ -64,6 +67,7 @@ export function LogView({ session }: { session: Session }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewHeight, setViewHeight] = useState(400);
   const [detailsWidth, setDetailsWidth] = useState(380);
+  const [branchesWidth, setBranchesWidth] = useState(220);
   const [widths, setWidths] = useState<Widths>({ graph: 5 * LANE_WIDTH, author: 140, date: 140, hash: 70 });
   const [version, setVersion] = useState(0);
   const [popup, setPopup] = useState<FilterPopup>();
@@ -120,7 +124,9 @@ export function LogView({ session }: { session: Session }) {
       revs = {};
       included.forEach((repo, i) => {
         const b = lists[i];
-        const has = b && (b.local.some((l) => l.name === branch) || b.remote.some((r) => `${r.remote}/${r.name}` === branch));
+        const has =
+          branch === "HEAD" ||
+          (b && (b.local.some((l) => l.name === branch) || b.remote.some((r) => `${r.remote}/${r.name}` === branch)));
         if (has) revs[repo] = [branch];
       });
     }
@@ -349,6 +355,14 @@ export function LogView({ session }: { session: Session }) {
   return (
     <div className="log-view">
       <div className="log-toolbar">
+        <button
+          className={`icon-button ${showBranches ? "active" : ""}`}
+          title="Show Branches"
+          aria-pressed={showBranches}
+          onClick={() => onShowBranches(!showBranches)}
+        >
+          <GitBranch size={16} />
+        </button>
         <label className="log-search">
           <Search size={14} className="secondary" />
           <input
@@ -397,6 +411,20 @@ export function LogView({ session }: { session: Session }) {
         </button>
       </div>
       <div className="log-body">
+        {showBranches && (
+          <>
+            <div className="log-branches-pane" style={{ width: branchesWidth }}>
+              <BranchesPanel
+                session={session}
+                repos={included}
+                reloadKey={`${refsKey}\n${version}`}
+                repoColor={repoColor}
+                onFilter={(branch) => setFilters((f) => ({ ...f, branch }))}
+              />
+            </div>
+            <Splitter direction="vertical" onResize={(d) => setBranchesWidth((w) => Math.max(120, Math.min(600, w + d)))} />
+          </>
+        )}
         <div
           ref={list}
           className="tree log-list"

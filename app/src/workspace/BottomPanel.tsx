@@ -11,6 +11,7 @@ export type BottomTab = "log" | "console";
 export function BottomPanel({ session, tab, onTab }: { session: Session; tab: BottomTab; onTab: (tab: BottomTab) => void }) {
   const [softWrap, setSoftWrap] = useState(true);
   const [showTimes, setShowTimes] = useState(true);
+  const [showBranches, setShowBranches] = useState(true);
   return (
     <div className="bottom-panel">
       <div className="tool-window-header">
@@ -25,7 +26,7 @@ export function BottomPanel({ session, tab, onTab }: { session: Session; tab: Bo
       {tab === "console" ? (
         <Console session={session} softWrap={softWrap} onSoftWrap={setSoftWrap} showTimes={showTimes} onShowTimes={setShowTimes} />
       ) : (
-        <LogView session={session} />
+        <LogView session={session} showBranches={showBranches} onShowBranches={setShowBranches} />
       )}
     </div>
   );
