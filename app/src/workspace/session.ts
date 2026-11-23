@@ -18,6 +18,9 @@ export type StatusEntry = { status?: RepoStatus; changelists?: Changelists; erro
 /** A repo's shelf entries, newest first. */
 export type ShelfState = { entries?: ShelfEntry[]; error?: string };
 
+/** A git command the helper ran, with its start time by this computer's clock (ms since the epoch). */
+export type ConsoleEntry = GitCommandLog & { started: number };
+
 export type SessionState = {
   info: ConnectedInfo;
   repos: Repo[];
@@ -25,7 +28,7 @@ export type SessionState = {
   reposError?: string;
   statuses: Record<string, StatusEntry>;
   shelves: Record<string, ShelfState>;
-  console: GitCommandLog[];
+  console: ConsoleEntry[];
   notices: string[];
   /** Background tasks in progress, shown in the status bar. */
   tasks: Task[];
@@ -82,9 +85,11 @@ export class Session {
         case "repo_changed":
           this.refreshStatus(event.repo);
           break;
-        case "git_command":
-          this.set({ console: [...this.state.console, event].slice(-CONSOLE_LIMIT) });
+        case "git_command": {
+          const entry = { ...event, started: Date.now() - event.duration_ms };
+          this.set({ console: [...this.state.console, entry].slice(-CONSOLE_LIMIT) });
           break;
+        }
         case "notice":
           this.set({ notices: [...this.state.notices, event.text] });
           break;

@@ -22,6 +22,8 @@
   --status-deleted: #868a91;
   --status-untracked: #d5756c;
   --status-conflicted: #e55765;
+  --text-editor: #bcbec4;
+  --console-prompt: #56a8f5;
   --font-ui: "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", "DejaVu Sans Mono", monospace;
   --row-height: 24px;
