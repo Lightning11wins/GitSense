@@ -1,24 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, FolderTree, GitBranch, RefreshCw } from "lucide-react";
-import type { Branches, LocalBranch, RemoteBranch, Worktree } from "../protocol.gen";
+import type { Branches, LocalBranch, Worktree } from "../protocol.gen";
 import { call } from "../api";
 import { useSession, type Session } from "./session";
 import { repoName } from "./repos";
-import { Menu, Popup, type MenuAction, type Point } from "./Popup";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { InputDialog } from "./InputDialog";
-
-type Item =
-  | { kind: "local"; branch: LocalBranch }
-  | { kind: "remote"; branch: RemoteBranch }
-  | { kind: "worktree"; worktree: Worktree };
-type Dialog =
-  | { kind: "new"; start: string; name: string; checkout: boolean }
-  | { kind: "revision" }
-  | { kind: "rename"; from: string }
-  | { kind: "force_delete"; name: string; error: string }
-  | { kind: "delete_remote"; remote: string; name: string }
-  | { kind: "delete_worktree"; worktree: Worktree };
+import { Menu, Popup, type Point } from "./Popup";
+import { BranchDialogView, branchActions, type BranchDialog, type BranchItem } from "./branchActions";
 
 /** IntelliJ's branches popup for one repo: local, remote, and worktree entries, each with a menu of actions. */
 export function BranchesPopup({ session, repo, at, onClose }: { session: Session; repo: string; at: Point; onClose: () => void }) {
@@ -28,8 +15,8 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
   const [error, setError] = useState<string>();
   const [filter, setFilter] = useState("");
   const [active, setActive] = useState(0);
-  const [menu, setMenu] = useState<{ item: Item; at: Point }>();
-  const [dialog, setDialog] = useState<Dialog>();
+  const [menu, setMenu] = useState<{ item: BranchItem; at: Point }>();
+  const [dialog, setDialog] = useState<BranchDialog>();
   const listRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -46,33 +33,12 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
     load();
   }, [repo]);
 
-  /** Closes the popup and runs a repo operation in the background, reporting failure in the status bar. */
-  async function run(label: string, work: () => Promise<unknown>) {
-    onClose();
-    try {
-      await session.track(label, work);
-    } catch (e) {
-      session.notify(String(e));
-    }
-    session.refreshStatus(repo);
-  }
-
-  /** Runs an operation from a dialog, which shows a failure itself. */
-  async function runInDialog(label: string, work: () => Promise<unknown>) {
-    try {
-      await session.track(label, work);
-    } finally {
-      session.refreshStatus(repo);
-    }
-  }
-
-  const current = data?.branches.local.find((b) => b.current)?.name;
   const words = filter.toLowerCase();
   const match = (text: string) => text.toLowerCase().includes(words);
   const local = data?.branches.local.filter((b) => match(b.name)) ?? [];
   const remote = data?.branches.remote.filter((b) => match(`${b.remote}/${b.name}`)) ?? [];
   const worktrees = data?.worktrees.filter((w) => w.path !== repo && match(`${w.branch ?? ""} ${w.path}`)) ?? [];
-  const items: Item[] = [
+  const items: BranchItem[] = [
     ...local.map((branch) => ({ kind: "local" as const, branch })),
     ...remote.map((branch) => ({ kind: "remote" as const, branch })),
     ...worktrees.map((worktree) => ({ kind: "worktree" as const, worktree })),
@@ -98,218 +64,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
     listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  function actions(item: Item): MenuAction[] {
-    if (item.kind === "worktree") {
-      const w = item.worktree;
-      return [
-        {
-          label: "Delete Worktree...",
-          disabled: w.is_main ? "The main working tree cannot be deleted" : undefined,
-          run: () => setDialog({ kind: "delete_worktree", worktree: w }),
-        },
-      ];
-    }
-    const noCurrent = current ? undefined : "HEAD is detached";
-    if (item.kind === "remote") {
-      const b = item.branch;
-      const full = `${b.remote}/${b.name}`;
-      const same = data?.branches.local.find((l) => l.name === b.name);
-      return [
-        {
-          label: "Checkout",
-          hint: same ? `as '${same.name}'` : undefined,
-          disabled: same && (same.current ? "Already checked out" : checkedOutElsewhere(same)),
-          run: () =>
-            run(`Checking out ${full}...`, () =>
-              call("checkout", {
-                repo,
-                target: same ? { kind: "branch", name: same.name } : { kind: "remote", remote: b.remote, name: b.name },
-              }),
-            ),
-        },
-        { label: `New Branch from '${full}'...`, run: () => setDialog({ kind: "new", start: full, name: b.name, checkout: true }) },
-        ...compareActions(full, undefined),
-        "separator",
-        {
-          label: `Rebase '${current ?? "HEAD"}' onto '${full}'`,
-          disabled: noCurrent,
-          run: () => run(`Rebasing onto ${full}...`, () => call("rebase", { repo, onto: full, branch: null })),
-        },
-        {
-          label: `Merge '${full}' into '${current ?? "HEAD"}'`,
-          disabled: noCurrent,
-          run: () => run(`Merging ${full}...`, () => call("merge", { repo, rev: full })),
-        },
-        "separator",
-        { label: "Delete", run: () => setDialog({ kind: "delete_remote", remote: b.remote, name: b.name }) },
-      ];
-    }
-    const b = item.branch;
-    const elsewhere = checkedOutElsewhere(b);
-    const isCurrent = b.current ? "This is the current branch" : undefined;
-    return [
-      {
-        label: "Checkout",
-        disabled: b.current ? "Already checked out" : elsewhere,
-        run: () => run(`Checking out ${b.name}...`, () => call("checkout", { repo, target: { kind: "branch", name: b.name } })),
-      },
-      { label: `New Branch from '${b.name}'...`, run: () => setDialog({ kind: "new", start: b.name, name: "", checkout: true }) },
-      {
-        label: `Checkout and Rebase onto '${current ?? "HEAD"}'`,
-        disabled: isCurrent ?? noCurrent ?? elsewhere,
-        run: () => run(`Rebasing ${b.name}...`, () => call("rebase", { repo, onto: current!, branch: b.name })),
-      },
-      ...compareActions(b.name, isCurrent),
-      "separator",
-      {
-        label: `Rebase '${current ?? "HEAD"}' onto '${b.name}'`,
-        disabled: isCurrent ?? noCurrent,
-        run: () => run(`Rebasing onto ${b.name}...`, () => call("rebase", { repo, onto: b.name, branch: null })),
-      },
-      {
-        label: `Merge '${b.name}' into '${current ?? "HEAD"}'`,
-        disabled: isCurrent ?? noCurrent,
-        run: () => run(`Merging ${b.name}...`, () => call("merge", { repo, rev: b.name })),
-      },
-      "separator",
-      {
-        label: "Update",
-        disabled: !b.upstream ? "The branch has no upstream" : elsewhere,
-        run: () =>
-          run(`Updating ${b.name}...`, () =>
-            b.current ? call("pull", { repo }) : call("branch.update", { repo, branch: b.name }),
-          ),
-      },
-      { label: "Push...", run: () => (onClose(), session.openPush({ repo, name: b.name })) },
-      "separator",
-      { label: "Rename...", run: () => setDialog({ kind: "rename", from: b.name }) },
-      { label: "Delete", disabled: isCurrent ?? elsewhere, run: () => deleteLocal(b.name) },
-    ];
-  }
-
-  function compareActions(branch: string, isCurrent: string | undefined): MenuAction[] {
-    return [
-      "separator",
-      {
-        label: `Compare with '${current ?? "HEAD"}'`,
-        disabled: isCurrent,
-        run: () => (onClose(), session.openCompare(repo, current ?? "HEAD", branch)),
-      },
-      { label: "Show Diff with Working Tree", run: () => (onClose(), session.openCompare(repo, branch, null)) },
-    ];
-  }
-
-  /** Deletes a merged branch, or asks before deleting an unmerged one. */
-  async function deleteLocal(name: string) {
-    setMenu(undefined);
-    try {
-      await session.track(`Deleting ${name}...`, () => call("branch.delete", { repo, name, remote: null, force: false }));
-      session.notify(`Deleted branch ${name}.`);
-      onClose();
-    } catch (e) {
-      setDialog({ kind: "force_delete", name, error: String(e) });
-    }
-  }
-
-  if (dialog) {
-    const title = repoName({ path: repo }, home);
-    switch (dialog.kind) {
-      case "new":
-        return (
-          <InputDialog
-            title={`Create New Branch in ${title}`}
-            label="New branch name"
-            initial={dialog.name}
-            confirmLabel="Create"
-            onConfirm={(name) =>
-              runInDialog(`Creating ${name}...`, () =>
-                call("branch.create", { repo, name, start: dialog.start, checkout: dialog.checkout }),
-              )
-            }
-            onClose={onClose}
-          >
-            <p className="secondary">Starts at {dialog.start}.</p>
-            <label>
-              <input
-                type="checkbox"
-                checked={dialog.checkout}
-                onChange={(e) => setDialog({ ...dialog, checkout: e.target.checked })}
-              />
-              Checkout branch
-            </label>
-          </InputDialog>
-        );
-      case "revision":
-        return (
-          <InputDialog
-            title={`Checkout Tag or Revision in ${title}`}
-            label="Tag or revision"
-            confirmLabel="Checkout"
-            onConfirm={(rev) => runInDialog(`Checking out ${rev}...`, () => call("checkout", { repo, target: { kind: "revision", rev } }))}
-            onClose={onClose}
-          />
-        );
-      case "rename":
-        return (
-          <InputDialog
-            title={`Rename Branch '${dialog.from}'`}
-            label="New name"
-            initial={dialog.from}
-            confirmLabel="Rename"
-            onConfirm={(to) => runInDialog(`Renaming ${dialog.from}...`, () => call("branch.rename", { repo, from: dialog.from, to }))}
-            onClose={onClose}
-          />
-        );
-      case "force_delete":
-        return (
-          <ConfirmDialog
-            title="Delete Branch"
-            confirmLabel="Delete Anyway"
-            onConfirm={() =>
-              runInDialog(`Deleting ${dialog.name}...`, () =>
-                call("branch.delete", { repo, name: dialog.name, remote: null, force: true }),
-              )
-            }
-            onClose={onClose}
-          >
-            <p className="error-text">{dialog.error}</p>
-            <p>Delete branch '{dialog.name}' anyway? Commits only on this branch will be lost.</p>
-          </ConfirmDialog>
-        );
-      case "delete_remote":
-        return (
-          <ConfirmDialog
-            title="Delete Remote Branch"
-            confirmLabel="Delete"
-            onConfirm={() =>
-              runInDialog(`Deleting ${dialog.remote}/${dialog.name}...`, () =>
-                call("branch.delete", { repo, name: dialog.name, remote: dialog.remote, force: false }),
-              )
-            }
-            onClose={onClose}
-          >
-            <p>
-              Delete branch '{dialog.name}' on remote '{dialog.remote}'?
-            </p>
-          </ConfirmDialog>
-        );
-      case "delete_worktree":
-        return (
-          <WorktreeDeleteDialog
-            worktree={dialog.worktree}
-            changes={statuses[dialog.worktree.path]?.status?.changes.length}
-            home={home}
-            onConfirm={async (force, deleteBranch) => {
-              await runInDialog("Deleting worktree...", () =>
-                call("worktree.remove", { repo, path: dialog.worktree.path, force, delete_branch: deleteBranch }),
-              );
-              session.loadRepos("repos.list");
-            }}
-            onClose={onClose}
-          />
-        );
-    }
-  }
+  if (dialog) return <BranchDialogView session={session} repo={repo} dialog={dialog} onChange={setDialog} onClose={onClose} />;
 
   let index = 0;
   /** A row for `items[index]`; rows render in the same order as `items`. */
@@ -403,17 +158,9 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
           {data && items.length === 0 && filter && <div className="secondary tree-message">No matches</div>}
         </div>
       </Popup>
-      {menu && <Menu at={menu.at} actions={actions(menu.item)} onClose={() => setMenu(undefined)} width={340} />}
+      {menu && <Menu at={menu.at} actions={branchActions({ session, repo, branches: data!.branches, close: onClose, openDialog: setDialog }, menu.item)} onClose={() => setMenu(undefined)} width={340} />}
     </>
   );
-}
-
-function plural(n: number, noun: string) {
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
-}
-
-function checkedOutElsewhere(b: LocalBranch) {
-  return b.worktree && !b.current ? `Checked out in ${b.worktree}` : undefined;
 }
 
 function trackHint(b: LocalBranch) {
@@ -428,51 +175,4 @@ function worktreeHint(w: Worktree, changes: number | undefined) {
   if (w.unmerged) parts.push(`${w.unmerged} unmerged`);
   if (w.prunable) parts.push("missing");
   return parts.join(" · ");
-}
-
-type WorktreeDeleteProps = {
-  worktree: Worktree;
-  /** Uncommitted changes, when the worktree is a known repo. */
-  changes: number | undefined;
-  home: string;
-  onConfirm: (force: boolean, deleteBranch: boolean) => Promise<void>;
-  onClose: () => void;
-};
-
-/** Confirms deleting a worktree, warning about work that would be lost. */
-function WorktreeDeleteDialog({ worktree, changes, home, onConfirm, onClose }: WorktreeDeleteProps) {
-  const [deleteBranch, setDeleteBranch] = useState(!!worktree.branch);
-  const [force, setForce] = useState(false);
-  const risky = !!changes || worktree.unmerged > 0;
-  return (
-    <ConfirmDialog
-      title="Delete Worktree"
-      confirmLabel={force ? "Force Delete" : "Delete"}
-      blocker={risky && !force ? "Check Force to lose this work" : undefined}
-      onConfirm={() => onConfirm(force, deleteBranch)}
-      onClose={onClose}
-    >
-      <p>
-        Delete the worktree at {repoName({ path: worktree.path }, home)}
-        {worktree.branch ? ` on branch '${worktree.branch}'` : ""}?
-      </p>
-      {!!changes && <p className="warning-text">It has {plural(changes, "uncommitted change")}.</p>}
-      {worktree.unmerged > 0 && (
-        <p className="warning-text">
-          {plural(worktree.unmerged, "commit")} at its HEAD {worktree.unmerged === 1 ? "is" : "are"} on no other branch or
-          remote branch.
-        </p>
-      )}
-      {worktree.branch && (
-        <label>
-          <input type="checkbox" checked={deleteBranch} onChange={(e) => setDeleteBranch(e.target.checked)} />
-          Delete branch '{worktree.branch}'
-        </label>
-      )}
-      <label>
-        <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
-        Force: delete even with uncommitted changes or unmerged commits
-      </label>
-    </ConfirmDialog>
-  );
 }
