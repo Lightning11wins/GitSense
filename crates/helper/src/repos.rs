@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use gitsense_protocol::{Empty, PathParams, Repo, SetHiddenParams};
@@ -113,18 +114,14 @@ pub fn scan(ctx: &Ctx, _: Empty) -> Result<Vec<Repo>> {
     let repos = {
         let mut store = ctx.repos.lock().unwrap();
         let old = std::mem::take(&mut store.data.repos);
-        let mut merged: Vec<StoredRepo> = found
-            .into_iter()
-            .map(|path| {
-                let path = path.display().to_string();
-                let hidden = old.iter().any(|r| r.path == path && r.hidden);
-                StoredRepo { path, hidden, manual: false }
-            })
-            .collect();
-        for repo in old {
-            if repo.manual && !merged.iter().any(|r| r.path == repo.path) {
-                merged.push(repo);
+        let mut merged: Vec<StoredRepo> = old.iter().filter(|r| r.manual).cloned().collect();
+        for path in found {
+            if merged.iter().any(|r| same_dir(Path::new(&r.path), &path)) {
+                continue;
             }
+            let path = path.display().to_string();
+            let hidden = old.iter().any(|r| r.path == path && r.hidden);
+            merged.push(StoredRepo { path, hidden, manual: false });
         }
         store.data.repos = merged;
         store.data.scanned = true;
@@ -136,18 +133,24 @@ pub fn scan(ctx: &Ctx, _: Empty) -> Result<Vec<Repo>> {
 }
 
 pub fn add(ctx: &Ctx, params: PathParams) -> Result<Repo> {
-    let dir = Path::new(&params.path);
+    let dir = expand_home(&params.path, &ctx.paths.home);
+    if !dir.is_absolute() {
+        return Err(Error::new(format!("Failed to add repo: '{}' is not an absolute path.", params.path)));
+    }
     if !dir.is_dir() {
         return Err(Error::new(format!("Failed to add repo: '{}' is not a dir.", params.path)));
     }
-    let out = git(ctx, dir).args(["rev-parse", "--show-toplevel"]).run()?;
-    let root = out.stdout_str()?.trim().to_string();
+    let out = git(ctx, &dir).args(["rev-parse", "--show-toplevel"]).run()?;
+    let top = out.stdout_str()?.trim().to_string();
+    // A symlink to the working tree keeps the name the user gave it.
+    let mut root = if same_dir(&dir, Path::new(&top)) { dir.display().to_string() } else { top };
     let repos = {
         let mut store = ctx.repos.lock().unwrap();
-        match store.data.repos.iter_mut().find(|r| r.path == root) {
+        match store.data.repos.iter_mut().find(|r| same_dir(Path::new(&r.path), Path::new(&root))) {
             Some(repo) => {
                 repo.manual = true;
                 repo.hidden = false;
+                root = repo.path.clone();
             }
             None => store.data.repos.push(StoredRepo { path: root.clone(), hidden: false, manual: true }),
         }
@@ -178,11 +181,34 @@ pub fn set_hidden(ctx: &Ctx, params: SetHiddenParams) -> Result<Empty> {
     Ok(Empty {})
 }
 
-/// Finds working trees under `root`, including nested ones, in path order.
+/// `path` with a leading `~` meaning `home`, without `.` parts or trailing slashes.
+fn expand_home(path: &str, home: &Path) -> PathBuf {
+    let path = path.trim();
+    let expanded = match path.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with('/') => home.join(rest.trim_start_matches('/')),
+        _ => PathBuf::from(path),
+    };
+    expanded.components().collect()
+}
+
+/// Whether two paths name the same dir, through symlinks.
+fn same_dir(a: &Path, b: &Path) -> bool {
+    a == b || matches!((a.canonicalize(), b.canonicalize()), (Ok(a), Ok(b)) if a == b)
+}
+
+/// Finds working trees under `root`, including nested ones and ones behind
+/// symlinks, in path order. A dir reachable by several paths is found once,
+/// preferring a path without symlinks.
 fn find_repos(root: &Path, skip_dirs: &[String]) -> Vec<PathBuf> {
     let mut found = Vec::new();
     let mut stack = vec![(root.to_path_buf(), 0)];
-    while let Some((dir, depth)) = stack.pop() {
+    let mut links = Vec::new();
+    let mut visited = HashSet::new();
+    while let Some((dir, depth)) = stack.pop().or_else(|| links.pop()) {
+        let Ok(real) = dir.canonicalize() else { continue };
+        if !visited.insert(real) {
+            continue;
+        }
         let Ok(entries) = std::fs::read_dir(&dir) else { continue };
         let mut is_repo = false;
         for entry in entries.flatten() {
@@ -193,8 +219,13 @@ fn find_repos(root: &Path, skip_dirs: &[String]) -> Vec<PathBuf> {
             }
             let Ok(file_type) = entry.file_type() else { continue };
             let skipped = skip_dirs.iter().any(|s| name == s.as_str());
-            if file_type.is_dir() && !skipped && depth < MAX_SCAN_DEPTH {
+            if skipped || depth >= MAX_SCAN_DEPTH {
+                continue;
+            }
+            if file_type.is_dir() {
                 stack.push((entry.path(), depth + 1));
+            } else if file_type.is_symlink() && entry.path().is_dir() {
+                links.push((entry.path(), depth + 1));
             }
         }
         if is_repo && GitDirs::find(&dir).is_some() {

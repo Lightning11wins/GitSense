@@ -32,6 +32,44 @@ async fn finds_repos_and_worktrees_but_skips_heavy_dirs() {
 }
 
 #[tokio::test]
+async fn finds_repos_behind_symlinks_once() {
+    let machine = Machine::new();
+    let home = machine.home();
+    machine.repo("code/app");
+    let outside = tempfile::tempdir().unwrap();
+    let elsewhere = outside.path().join("elsewhere");
+    std::fs::create_dir(&elsewhere).unwrap();
+    machine.git(&elsewhere, &["init", "-q"]);
+    std::os::unix::fs::symlink(&elsewhere, home.join("elsewhere-link")).unwrap();
+    std::os::unix::fs::symlink(home.join("code"), home.join("code-link")).unwrap();
+    std::os::unix::fs::symlink(&home, home.join("code/home-loop")).unwrap();
+
+    let session = machine.connect_local().await;
+    let repos = session.conn.call::<ReposList>(Empty {}).await.unwrap();
+    let home = home.display().to_string();
+    let found: Vec<&str> = repos.iter().map(|r| r.path.strip_prefix(&home).unwrap()).collect();
+    assert_eq!(found, ["/code/app", "/elsewhere-link"]);
+}
+
+#[tokio::test]
+async fn adds_repos_by_home_relative_path() {
+    let machine = Machine::new();
+    let outside = tempfile::tempdir().unwrap();
+    let extra = outside.path().join("extra");
+    std::fs::create_dir(&extra).unwrap();
+    machine.git(&extra, &["init", "-q"]);
+    std::os::unix::fs::symlink(&extra, machine.home().join("extra-link")).unwrap();
+
+    let session = machine.connect_local().await;
+    let added = session.conn.call::<ReposAdd>(PathParams { path: "~/extra-link/".into() }).await.unwrap();
+    assert_eq!(added.path, machine.home().join("extra-link").display().to_string());
+    let again = session.conn.call::<ReposAdd>(PathParams { path: extra.display().to_string() }).await.unwrap();
+    assert_eq!(again.path, added.path);
+    let relative = session.conn.call::<ReposAdd>(PathParams { path: "extra-link".into() }).await;
+    assert!(relative.is_err());
+}
+
+#[tokio::test]
 async fn keeps_hidden_and_manual_repos_across_scans() {
     let machine = Machine::new();
     let app = machine.repo("app");

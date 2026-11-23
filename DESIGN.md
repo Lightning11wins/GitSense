@@ -109,7 +109,7 @@ Keyboard shortcuts follow IntelliJ's default Linux keymap for every implemented 
 ### Machines and repos
 
 - Connect over SSH or to this computer; auto-reconnect after drops, keeping UI state.
-- On first connect, scan the home dir for repos and worktrees, skipping heavy dirs (`node_modules`, caches, build output; list is configurable). Remember the result; rescan on demand. Manually add or hide repos.
+- On first connect, scan the home dir for repos and worktrees, following symlinks (each dir once), skipping heavy dirs (`node_modules`, caches, build output; list is configurable). Remember the result; rescan on demand. Manually add or hide repos.
 - Repos are independent: branch operations target one repo, while the commit panel and log can show all repos together. Worktrees appear as repos grouped under their main repo.
 - Background fetch of all repos every few minutes (interval configurable, can be turned off).
 
