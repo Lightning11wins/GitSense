@@ -49,7 +49,7 @@ export function RepoManager({ session, onClose }: { session: Session; onClose: (
               if (path.trim()) add();
             }}
           >
-            <input className="grow" placeholder="Add a repository by absolute path" value={path} onChange={(e) => setPath(e.target.value)} />
+            <input className="grow" placeholder="Add a repository by absolute or ~/ path" value={path} onChange={(e) => setPath(e.target.value)} />
             <button className="button" disabled={!path.trim()}>
               Add
             </button>

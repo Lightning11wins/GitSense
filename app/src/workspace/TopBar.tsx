@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, RefreshCw, Server, Square, SquareCheck } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderCog, FolderGit2, RefreshCw, Server, Square, SquareCheck } from "lucide-react";
 import { newWindow } from "../api";
 import { below, Popup } from "./Popup";
 import { RepoManager } from "./RepoManager";
@@ -90,6 +90,9 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
             </button>
             <button className="icon-button" title="Fetch All" onClick={() => (close(), session.fetchAll())}>
               <RefreshCw size={14} />
+            </button>
+            <button className="icon-button" title="Manage Repositories..." onClick={() => setOpen({ kind: "manage" })}>
+              <FolderCog size={14} />
             </button>
           </div>
           <div className="popup-list">
