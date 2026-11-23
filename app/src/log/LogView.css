@@ -93,8 +93,15 @@
   position: absolute;
   left: 0;
   right: 0;
-  gap: 6px;
+  gap: 0;
   padding-left: 4px;
+}
+
+.log-column-resizer {
+  flex: none;
+  align-self: stretch;
+  width: 6px;
+  cursor: col-resize;
 }
 
 .tree:not(:focus-within) .log-row.selected {
@@ -106,6 +113,10 @@
   width: 4px;
   height: 16px;
   border-radius: 2px;
+}
+
+.log-row .log-repo-marker {
+  margin-right: 6px;
 }
 
 .log-graph {
@@ -123,19 +134,20 @@
 
 .log-author {
   flex: none;
-  width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .log-date {
   flex: none;
-  width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .log-hash {
   flex: none;
-  width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
 }
 

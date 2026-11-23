@@ -5,7 +5,7 @@ import { call } from "../api";
 import { useSession, type Session } from "../workspace/session";
 import { repoName } from "../workspace/repos";
 import { Menu, Popup, below, type MenuAction, type Point } from "../workspace/Popup";
-import { Splitter } from "../workspace/Splitter";
+import { Splitter, startDrag } from "../workspace/Splitter";
 import { InputDialog } from "../workspace/InputDialog";
 import { layoutGraph, type GraphRow, type Segment } from "./graph";
 import { interleave, type LogRow } from "./interleave";
@@ -18,6 +18,10 @@ const ROW_HEIGHT = 24;
 /** Half a row, so a one-lane change fits in a row at 45 degrees. */
 const LANE_WIDTH = ROW_HEIGHT / 2;
 const MAX_LANES = 16;
+/** Columns in row order. The subject takes the space the others leave. */
+const COLUMNS = ["graph", "subject", "author", "date", "hash"] as const;
+type Widths = Record<Exclude<(typeof COLUMNS)[number], "subject">, number>;
+const MIN_COLUMN_WIDTH = 24;
 const LANE_COLORS = ["#56a8f5", "#73bd79", "#e5a14e", "#c77dbb", "#5fb8b3", "#e06c75", "#b0a160", "#8f9be8"];
 export const REPO_COLORS = ["#3d7bd9", "#5a9e4b", "#c7853a", "#a2569a", "#3f9c98", "#c4545e", "#8f8440", "#6c76c9"];
 const DATES = [
@@ -32,6 +36,17 @@ type RepoLog = { commits: LogCommit[]; complete: boolean; loading: boolean; erro
 type Query = { revs: Record<string, string[]>; params: Omit<LogParams, "repo" | "revs" | "skip"> };
 type FilterPopup = { kind: "branch" | "author" | "date" | "repo"; at: Point };
 type Dialog = { kind: "path" } | { kind: "branch" | "reset" | "reword"; row: LogRow };
+
+/** Moves the boundary after column `index` by `delta`, resizing only the two columns beside it. */
+function resizeColumns(widths: Widths, index: number, delta: number): Widths {
+  const [left, right] = [COLUMNS[index], COLUMNS[index + 1]];
+  const next = { ...widths };
+  if (left !== "subject") next[left] = Math.max(MIN_COLUMN_WIDTH, widths[left] + delta);
+  const moved = left === "subject" ? delta : next[left] - widths[left];
+  if (right !== "subject") next[right] = Math.max(MIN_COLUMN_WIDTH, widths[right] - moved);
+  if (left !== "subject" && right !== "subject") next[left] = widths[left] + widths[right] - next[right];
+  return next;
+}
 
 /** Rows are keyed by repo and hash, since separate clones share commits. */
 const rowKey = (row: LogRow) => `${row.repo}\0${row.commit.hash}`;
@@ -49,6 +64,7 @@ export function LogView({ session }: { session: Session }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewHeight, setViewHeight] = useState(400);
   const [detailsWidth, setDetailsWidth] = useState(380);
+  const [widths, setWidths] = useState<Widths>({ graph: 5 * LANE_WIDTH, author: 140, date: 140, hash: 70 });
   const [version, setVersion] = useState(0);
   const [popup, setPopup] = useState<FilterPopup>();
   const [menu, setMenu] = useState<Point>();
@@ -144,9 +160,6 @@ export function LogView({ session }: { session: Session }) {
         : layoutGraph(rows.map((r) => ({ hash: rowKey(r), parents: r.commit.parents.map((p) => `${r.repo}\0${p}`) }))),
     [rows, filtered],
   );
-  const lanes = graph
-    ? Math.min(MAX_LANES, Math.max(1, ...graph.map((g) => Math.max(g.lane, ...g.segments.flatMap((s) => [s.from, s.to])) + 1)))
-    : 0;
 
   // Load the next page of the repo that holds the list back, once the view nears the end.
   const lastVisible = Math.ceil((scrollTop + viewHeight) / ROW_HEIGHT);
@@ -324,6 +337,14 @@ export function LogView({ session }: { session: Session }) {
   const errors = Object.entries(logs).filter(([, l]) => l.error);
   const authors = useMemo(() => [...new Set(rows.map((r) => r.commit.author_name))].sort(), [rows]);
   const multiRepo = included.length > 1;
+  // The gap after column `index`, which drags to resize the columns beside it.
+  const resizer = (index: number) => (
+    <span
+      className="log-column-resizer"
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => startDrag(e, "vertical", (d) => setWidths((w) => resizeColumns(w, index, d)))}
+    />
+  );
 
   return (
     <div className="log-view">
@@ -418,7 +439,8 @@ export function LogView({ session }: { session: Session }) {
                       title={repoName({ path: row.repo }, home)}
                     />
                   )}
-                  {graph && <GraphCell row={graph[index]} above={graph[index - 1]} lanes={lanes} head={row.commit.head} />}
+                  {graph && <GraphCell row={graph[index]} above={graph[index - 1]} width={widths.graph} head={row.commit.head} />}
+                  {graph && resizer(0)}
                   <span className="log-subject">
                     {row.commit.head && !row.commit.refs.some((r) => r.kind === "local" && r.name === branch) && (
                       <span className="log-ref head">HEAD</span>
@@ -433,9 +455,18 @@ export function LogView({ session }: { session: Session }) {
                     ))}
                     {row.commit.subject}
                   </span>
-                  <span className="log-author secondary">{row.commit.author_name}</span>
-                  <span className="log-date secondary">{formatTime(row.commit.author_time)}</span>
-                  <span className="log-hash secondary mono">{row.commit.hash.slice(0, 8)}</span>
+                  {resizer(1)}
+                  <span className="log-author secondary" style={{ width: widths.author }}>
+                    {row.commit.author_name}
+                  </span>
+                  {resizer(2)}
+                  <span className="log-date secondary" style={{ width: widths.date }}>
+                    {formatTime(row.commit.author_time)}
+                  </span>
+                  {resizer(3)}
+                  <span className="log-hash secondary mono" style={{ width: widths.hash }}>
+                    {row.commit.hash.slice(0, 8)}
+                  </span>
                 </div>
               );
             })}
@@ -535,8 +566,13 @@ export function LogView({ session }: { session: Session }) {
   );
 }
 
-/** One row of the commit graph: the lines from the row above, the lines leaving this row, and the commit. */
-function GraphCell({ row, above, lanes, head }: { row: GraphRow; above?: GraphRow; lanes: number; head: boolean }) {
+/**
+ * One row of the commit graph: the lines from the row above, the lines leaving this row, and the commit. It is `width`
+ * wide, or wider when its lanes need more.
+ */
+function GraphCell({ row, above, width, head }: { row: GraphRow; above?: GraphRow; width: number; head: boolean }) {
+  const segments = [...row.segments, ...(above?.segments ?? [])];
+  const lanes = Math.min(MAX_LANES, Math.max(row.lane, ...segments.flatMap((s) => [s.from, s.to])) + 1);
   const x = (lane: number) => Math.min(lane, MAX_LANES - 1) * LANE_WIDTH + LANE_WIDTH / 2;
   const mid = ROW_HEIGHT / 2;
   const color = (c: number) => LANE_COLORS[c % LANE_COLORS.length];
@@ -553,7 +589,7 @@ function GraphCell({ row, above, lanes, head }: { row: GraphRow; above?: GraphRo
       <path key={key + i} d={path(s, y)} fill="none" stroke={color(s.color)} strokeWidth={2} strokeLinejoin="round" />
     ));
   return (
-    <svg className="log-graph" width={lanes * LANE_WIDTH} height={ROW_HEIGHT}>
+    <svg className="log-graph" width={Math.max(width, lanes * LANE_WIDTH)} height={ROW_HEIGHT}>
       {above && lines(above, mid - ROW_HEIGHT, "above")}
       {lines(row, mid, "")}
       <circle
