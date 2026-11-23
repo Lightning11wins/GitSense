@@ -24,6 +24,8 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
   const [open, setOpen] = useState<Open>(null);
   const close = () => setOpen(null);
   const visible = repos.filter((r) => !r.hidden);
+  const setAllHidden = (hidden: boolean) =>
+    Promise.all(repos.filter((r) => r.hidden !== hidden).map((r) => session.setHidden(r.path, hidden))).catch((e) => session.notify(String(e)));
   const changed = visible.filter((r) => (statuses[r.path]?.status?.changes.length ?? 0) > 0).length;
 
   return (
@@ -108,6 +110,13 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
                 </div>
               );
             })}
+            <div className="popup-separator" />
+            <button className="popup-item" disabled={repos.every((r) => !r.hidden)} onClick={() => setAllHidden(false)}>
+              Select All
+            </button>
+            <button className="popup-item" disabled={repos.every((r) => r.hidden)} onClick={() => setAllHidden(true)}>
+              Deselect All
+            </button>
           </div>
         </Popup>
       )}
