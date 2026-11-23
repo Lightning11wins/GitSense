@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, GitBranch, RefreshCw, Server } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, ChevronRight, FolderGit2, RefreshCw, Server } from "lucide-react";
 import { newWindow } from "../api";
 import { below, Popup } from "./Popup";
 import { RepoManager } from "./RepoManager";
@@ -85,20 +85,27 @@ export function TopBar({ session, onCommit }: { session: Session; onCommit: () =
             </button>
           </div>
           <div className="popup-list">
-            {visible.map((repo) => {
+            {repos.map((repo) => {
               const status = statuses[repo.path]?.status;
               return (
-                <button
-                  key={repo.path}
-                  className="popup-item"
-                  title={repo.path}
-                  onClick={(e) => setOpen({ kind: "branches", repo: repo.path, at: { x: e.currentTarget.getBoundingClientRect().left, y: open.at.y } })}
-                >
-                  <GitBranch size={14} className="secondary" />
-                  {repoName(repo, info.home)}
-                  <span className="hint">{status ? (status.branch ?? "detached HEAD") : ""}</span>
-                  <ChevronRight size={14} className="secondary" />
-                </button>
+                <div key={repo.path} className="popup-check-row">
+                  <input
+                    type="checkbox"
+                    title={repo.hidden ? "Show this repository" : "Hide this repository"}
+                    checked={!repo.hidden}
+                    onChange={(e) => session.setHidden(repo.path, !e.target.checked).catch((err) => session.notify(String(err)))}
+                  />
+                  <button
+                    className="popup-item"
+                    title={repo.path}
+                    disabled={repo.hidden}
+                    onClick={(e) => setOpen({ kind: "branches", repo: repo.path, at: { x: e.currentTarget.getBoundingClientRect().left, y: open.at.y } })}
+                  >
+                    {repoName(repo, info.home)}
+                    {!repo.hidden && <span className="hint">{status ? (status.branch ?? "detached HEAD") : ""}</span>}
+                    {!repo.hidden && <ChevronRight size={14} className="secondary" />}
+                  </button>
+                </div>
               );
             })}
           </div>

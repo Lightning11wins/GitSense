@@ -249,6 +249,19 @@
   cursor: default;
 }
 
+/* A popup item with a checkbox before it, like the repos popup's show/hide boxes. */
+.popup-check-row {
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+}
+
+.popup-check-row .popup-item {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
 .popup-item .hint {
   margin-left: auto;
   padding-left: 16px;
