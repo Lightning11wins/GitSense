@@ -698,7 +698,7 @@ function ChangesMenu(props: MenuProps) {
   );
   return (
     <Popup at={menu.at} onClose={onClose}>
-      <div className="popup-list" style={{ paddingTop: 4 }}>
+      <div className="popup-list">
         {item("Show Diff", "Ctrl+D", menu.nodes.length > 0, onShowDiff)}
         {item("Rollback...", "Ctrl+Alt+Z", tracked, onRollback, "Select changed files to roll back")}
         {item("Move to Another Changelist...", "Alt+Shift+M", tracked, props.onMoveToList, "Select changed files to move")}

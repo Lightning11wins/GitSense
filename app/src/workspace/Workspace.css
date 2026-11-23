@@ -279,6 +279,11 @@
   padding-bottom: 4px;
 }
 
+/* With no title or search above it, the list needs the same gap at the popup's top edge. */
+.popup-list:first-child {
+  padding-top: 4px;
+}
+
 .update-icon {
   color: var(--status-modified);
 }
