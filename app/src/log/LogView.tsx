@@ -551,7 +551,7 @@ export function LogView({ session, showBranches, onShowBranches }: Props) {
           </div>
         </Popup>
       )}
-      {menu && <Menu at={menu} actions={actions()} onClose={() => setMenu(undefined)} width={300} />}
+      {menu && <Menu at={menu} actions={actions()} onClose={() => setMenu(undefined)} />}
       {dialog?.kind === "path" && (
         <InputDialog
           title="Filter by Path"

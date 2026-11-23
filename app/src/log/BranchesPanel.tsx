@@ -225,7 +225,6 @@ export function BranchesPanel({ session, repos, reloadKey, repoColor, onFilter }
       {actionMenu && actionRepo && actionItem && (
         <Menu
           at={actionMenu.at}
-          width={340}
           onClose={() => setActionMenu(undefined)}
           actions={branchActions(
             {

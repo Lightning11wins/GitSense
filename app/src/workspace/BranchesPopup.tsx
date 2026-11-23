@@ -158,7 +158,7 @@ export function BranchesPopup({ session, repo, at, onClose }: { session: Session
           {data && items.length === 0 && filter && <div className="secondary tree-message">No matches</div>}
         </div>
       </Popup>
-      {menu && <Menu at={menu.at} actions={branchActions({ session, repo, branches: data!.branches, close: onClose, openDialog: setDialog }, menu.item)} onClose={() => setMenu(undefined)} width={340} />}
+      {menu && <Menu at={menu.at} actions={branchActions({ session, repo, branches: data!.branches, close: onClose, openDialog: setDialog }, menu.item)} onClose={() => setMenu(undefined)} />}
     </>
   );
 }

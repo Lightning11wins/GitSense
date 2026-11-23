@@ -7,7 +7,7 @@ type Props = {
   at: Point;
   onClose: () => void;
   children: ReactNode;
-  width?: number;
+  width?: number | "max-content";
 };
 
 /** A floating panel that closes on outside click or Escape, kept inside the window. */
@@ -45,10 +45,10 @@ export function below(element: Element): Point {
 /** A menu action. `disabled` says why it is unavailable. */
 export type MenuAction = { label: string; hint?: string; disabled?: string; run: () => void } | "separator";
 
-/** A popup menu of actions. Choosing one closes the menu, then runs it. */
-export function Menu({ at, actions, onClose, width }: { at: Point; actions: MenuAction[]; onClose: () => void; width?: number }) {
+/** A popup menu of actions, as wide as its longest label. Choosing one closes the menu, then runs it. */
+export function Menu({ at, actions, onClose }: { at: Point; actions: MenuAction[]; onClose: () => void }) {
   return (
-    <Popup at={at} onClose={onClose} width={width}>
+    <Popup at={at} onClose={onClose} width="max-content">
       <div className="popup-list">
         {actions.map((a, i) =>
           a === "separator" ? (
