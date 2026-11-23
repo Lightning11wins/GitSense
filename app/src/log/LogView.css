@@ -31,6 +31,16 @@
   background: var(--bg-input);
 }
 
+/* The field draws the focus ring, so the input inside it must not draw its own. */
+.log-search:focus-within {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+.log-search input:focus {
+  box-shadow: none;
+}
+
 .log-search input {
   flex: 1;
   min-width: 0;
