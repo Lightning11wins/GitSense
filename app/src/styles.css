@@ -55,7 +55,8 @@ button {
   color: inherit;
 }
 
-input,
+/* Text fields only; checkboxes and radios keep their native look. */
+input:where(:not([type="checkbox"], [type="radio"])),
 textarea {
   font: inherit;
   color: var(--text);
@@ -66,7 +67,7 @@ textarea {
   user-select: text;
 }
 
-input:focus,
+input:where(:not([type="checkbox"], [type="radio"])):focus,
 textarea:focus {
   border-color: var(--focus);
   box-shadow: 0 0 0 1px var(--focus);
