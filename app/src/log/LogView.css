@@ -110,6 +110,8 @@
 
 .log-graph {
   flex: none;
+  /* Lines are drawn whole and cut at the row's edges. */
+  overflow: hidden;
 }
 
 .log-subject {

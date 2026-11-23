@@ -1,20 +1,20 @@
-// Commit graph layout: assigns each commit a lane and lists the line segments drawn in its row.
+// Commit graph layout: assigns each commit a lane and lists the lines drawn below it.
 
-/** A line in one row, from lane `from` to lane `to`. Coordinates are lanes, not pixels. */
+/** A line from lane `from` at this row's commit height to lane `to` at the next row's. Coordinates are lanes, not pixels. */
 export type Segment = {
   from: number;
   to: number;
-  /** `top` runs from the row's top edge to its middle, `bottom` from the middle to the bottom edge, `through` the full height. */
-  part: "top" | "bottom" | "through";
   color: number;
+  /** The line runs from a merge commit to a parent other than its first. */
+  merge: boolean;
 };
 
 export type GraphRow = { lane: number; color: number; segments: Segment[] };
 
 /**
- * Lays out commits listed children before parents. Each row has the commit's lane and color, and its segments: edges
- * from children above, edges to parents below, and lines passing by. A parent missing from the list keeps its line
- * running to the bottom.
+ * Lays out commits listed children before parents. Each row has the commit's lane and color, and the segments leaving
+ * it downward: edges to parents and lines passing by. A parent missing from the list keeps its line running to the
+ * bottom.
  */
 export function layoutGraph(commits: readonly { hash: string; parents: readonly string[] }[]): GraphRow[] {
   /** The hash each lane is waiting for, or null when free. */
@@ -36,30 +36,29 @@ export function layoutGraph(commits: readonly { hash: string; parents: readonly 
     const moved = first === undefined ? -1 : lanes.indexOf(first);
     const segments: Segment[] = [];
     lanes.forEach((hash, i) => {
-      if (hash !== null) segments.push({ from: i, to: i === moved && moved > lane ? lane : i, part: "through", color: colors[i] });
+      if (hash !== null) segments.push({ from: i, to: i === moved && moved > lane ? lane : i, color: colors[i], merge: false });
     });
-    for (const i of incoming) segments.push({ from: i, to: lane, part: "top", color: colors[i] });
 
     if (first !== undefined) {
       if (moved >= 0 && moved < lane) {
-        segments.push({ from: lane, to: moved, part: "bottom", color: colors[moved] });
+        segments.push({ from: lane, to: moved, color: colors[moved], merge: false });
       } else {
         if (moved > lane) lanes[moved] = null;
         lanes[lane] = first;
         colors[lane] = color;
-        segments.push({ from: lane, to: lane, part: "bottom", color });
+        segments.push({ from: lane, to: lane, color, merge: false });
       }
     }
     for (const parent of others) {
       const existing = lanes.indexOf(parent);
       if (existing >= 0) {
-        segments.push({ from: lane, to: existing, part: "bottom", color: colors[existing] });
+        segments.push({ from: lane, to: existing, color: colors[existing], merge: true });
         continue;
       }
       const target = free();
       lanes[target] = parent;
       colors[target] = nextColor++;
-      segments.push({ from: lane, to: target, part: "bottom", color: colors[target] });
+      segments.push({ from: lane, to: target, color: colors[target], merge: true });
     }
     while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
     return { lane, color, segments };

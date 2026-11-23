@@ -7,7 +7,7 @@ import { repoName } from "../workspace/repos";
 import { Menu, Popup, below, type MenuAction, type Point } from "../workspace/Popup";
 import { Splitter } from "../workspace/Splitter";
 import { InputDialog } from "../workspace/InputDialog";
-import { layoutGraph, type GraphRow } from "./graph";
+import { layoutGraph, type GraphRow, type Segment } from "./graph";
 import { interleave, type LogRow } from "./interleave";
 import { CommitDetails } from "./CommitDetails";
 import { ResetDialog, RewordDialog } from "./CommitDialogs";
@@ -15,7 +15,8 @@ import "./LogView.css";
 
 const PAGE = 200;
 const ROW_HEIGHT = 24;
-const LANE_WIDTH = 14;
+/** Half a row, so a one-lane change fits in a row at 45 degrees. */
+const LANE_WIDTH = ROW_HEIGHT / 2;
 const MAX_LANES = 16;
 const LANE_COLORS = ["#56a8f5", "#73bd79", "#e5a14e", "#c77dbb", "#5fb8b3", "#e06c75", "#b0a160", "#8f9be8"];
 export const REPO_COLORS = ["#3d7bd9", "#5a9e4b", "#c7853a", "#a2569a", "#3f9c98", "#c4545e", "#8f8440", "#6c76c9"];
@@ -417,7 +418,7 @@ export function LogView({ session }: { session: Session }) {
                       title={repoName({ path: row.repo }, home)}
                     />
                   )}
-                  {graph && <GraphCell row={graph[index]} lanes={lanes} head={row.commit.head} />}
+                  {graph && <GraphCell row={graph[index]} above={graph[index - 1]} lanes={lanes} head={row.commit.head} />}
                   <span className="log-subject">
                     {row.commit.head && !row.commit.refs.some((r) => r.kind === "local" && r.name === branch) && (
                       <span className="log-ref head">HEAD</span>
@@ -534,17 +535,27 @@ export function LogView({ session }: { session: Session }) {
   );
 }
 
-/** One row of the commit graph. */
-function GraphCell({ row, lanes, head }: { row: GraphRow; lanes: number; head: boolean }) {
+/** One row of the commit graph: the lines from the row above, the lines leaving this row, and the commit. */
+function GraphCell({ row, above, lanes, head }: { row: GraphRow; above?: GraphRow; lanes: number; head: boolean }) {
   const x = (lane: number) => Math.min(lane, MAX_LANES - 1) * LANE_WIDTH + LANE_WIDTH / 2;
   const mid = ROW_HEIGHT / 2;
   const color = (c: number) => LANE_COLORS[c % LANE_COLORS.length];
+  // A lane change is a 45 degree diagonal: at the start for merge lines, which leave beside the first parent's line,
+  // and otherwise at the end. Changes too wide for one row run straight.
+  const path = (s: Segment, y: number) => {
+    const [x1, x2, y2] = [x(s.from), x(s.to), y + ROW_HEIGHT];
+    const run = Math.abs(x2 - x1);
+    if (run === 0 || run >= ROW_HEIGHT) return `M${x1} ${y}L${x2} ${y2}`;
+    return s.merge ? `M${x1} ${y}L${x2} ${y + run}L${x2} ${y2}` : `M${x1} ${y}L${x1} ${y2 - run}L${x2} ${y2}`;
+  };
+  const lines = (r: GraphRow, y: number, key: string) =>
+    r.segments.map((s, i) => (
+      <path key={key + i} d={path(s, y)} fill="none" stroke={color(s.color)} strokeWidth={2} strokeLinejoin="round" />
+    ));
   return (
     <svg className="log-graph" width={lanes * LANE_WIDTH} height={ROW_HEIGHT}>
-      {row.segments.map((s, i) => {
-        const [y1, y2] = s.part === "top" ? [0, mid] : s.part === "bottom" ? [mid, ROW_HEIGHT] : [0, ROW_HEIGHT];
-        return <line key={i} x1={x(s.from)} y1={y1} x2={x(s.to)} y2={y2} stroke={color(s.color)} strokeWidth={2} />;
-      })}
+      {above && lines(above, mid - ROW_HEIGHT, "above")}
+      {lines(row, mid, "")}
       <circle
         cx={x(row.lane)}
         cy={mid}
